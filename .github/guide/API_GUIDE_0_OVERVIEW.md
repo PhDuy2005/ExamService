@@ -84,6 +84,16 @@ Theo yêu cầu hiện tại:
 - Trạng thái:
   - đã có API
 
+### 2.7. Scoring Rules
+
+- Mục đích:
+  - mô tả riêng nghiệp vụ chấm điểm
+  - làm tài liệu thống nhất cho backend, frontend và QA
+- File guide chi tiết:
+  - [.github/guide/SCORING_RULES.md](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/SCORING_RULES.md)
+- Trạng thái:
+  - đã có tài liệu
+
 ---
 
 ## 3. Thứ tự đề xuất để viết guide chi tiết
@@ -96,6 +106,7 @@ Nếu viết tiếp theo mức độ ưu tiên cho frontend, mình đề xuất:
 4. `Exam Attempt Module`
 5. `Exam Assignment Module`
 6. `System / Health Module`
+7. `Scoring Rules`
 
 ---
 
