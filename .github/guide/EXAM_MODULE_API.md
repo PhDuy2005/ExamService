@@ -31,6 +31,14 @@ Khi gắn vào đề, backend sẽ snapshot group sang:
 
 Tất cả API thành công của module này đều được bọc bởi `RestResponse`.
 
+### Quy ước xác thực
+
+- frontend cần gửi:
+  - `Authorization: Bearer <access_token>`
+- `access token` được cấp từ `Management Service`
+- khi backend cần xác định người tạo hoặc người cập nhật đề, backend đọc từ claim:
+  - `user.id`
+
 ### Format thành công chung
 
 ```json
@@ -384,7 +392,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -459,7 +467,7 @@ Ví dụ rút gọn:
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -504,7 +512,7 @@ Do backend đang trả `Page<ResExamDTO>`, dữ liệu trong `data` là object p
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -540,7 +548,7 @@ Trả `ResExamDTO` giống API tạo đề.
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -581,7 +589,7 @@ Trả `ResExamDTO` giống API lấy chi tiết đề.
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 

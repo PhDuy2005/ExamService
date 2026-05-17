@@ -20,6 +20,14 @@ Hiện tại module này hỗ trợ:
 
 Tất cả API thành công của module này đều được bọc bởi `RestResponse`.
 
+### Quy ước xác thực
+
+- frontend cần gửi:
+  - `Authorization: Bearer <access_token>`
+- `access token` được cấp từ `Management Service`
+- khi backend cần xác định người tạo group, backend đọc từ claim:
+  - `user.id`
+
 ### Format thành công chung
 
 ```json
@@ -203,7 +211,7 @@ Tạo `question group` mới -> validate dữ liệu đầu vào -> kiểm tra d
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -264,7 +272,7 @@ Trả `ResQuestionGroupDTO`, ví dụ:
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -307,7 +315,7 @@ Do backend đang trả `Page<ResQuestionGroupDTO>`, dữ liệu trong `data` là
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 

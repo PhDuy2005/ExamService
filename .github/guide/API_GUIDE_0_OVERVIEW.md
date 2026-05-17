@@ -131,7 +131,20 @@ Ví dụ phong cách mô tả luồng:
 
 ---
 
-## 5. Ghi chú hiện tại
+## 5. Quy ước xác thực chung
+
+- `ExamService` không tự phát hành token
+- frontend cần dùng `access token` do `Management Service` cấp
+- header gửi lên backend:
+  - `Authorization: Bearer <access_token>`
+- backend hiện đọc user hiện tại từ claim:
+  - `user.id`
+- nếu cần tra cứu cấu trúc token chi tiết của `Management Service`, xem thêm:
+  - [.github/guide/from-management-service/API Guide 1 - Auth.md](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/from-management-service/API%20Guide%201%20-%20Auth.md)
+
+---
+
+## 6. Ghi chú hiện tại
 
 - Tài liệu này mới là phần khung tổng quan
 - Nội dung chi tiết của từng module sẽ được bổ sung dần theo yêu cầu tiếp theo của bạn

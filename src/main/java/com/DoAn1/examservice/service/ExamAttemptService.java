@@ -684,7 +684,7 @@ public class ExamAttemptService {
     private UUID resolveCurrentStudentUuid() {
         return SecurityUtil.getCurrentUserUuid()
                 .map(UUID::fromString)
-                .orElseThrow(() -> new IdInvalidException("Student uuid is missing from JWT"));
+                .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
     private record AttemptQuestionSnapshot(

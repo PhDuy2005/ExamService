@@ -23,6 +23,15 @@ Module này cũng là nơi xử lý các nghiệp vụ quan trọng:
 
 Tất cả API thành công của module này đều được bọc bởi `RestResponse`.
 
+### Quy ước xác thực
+
+- frontend cần gửi:
+  - `Authorization: Bearer <access_token>`
+- `access token` được cấp từ `Management Service`
+- backend xác định học sinh hiện tại từ claim:
+  - `user.id`
+- field `studentUuid` trong response là id của user hiện tại được đọc từ `access token`
+
 ### Format thành công chung
 
 ```json
@@ -134,7 +143,7 @@ Ví dụ:
 - nếu `startTime` có giá trị, không được start trước thời điểm đó
 - nếu `endTime` có giá trị, không được start sau thời điểm đó
 - phải tôn trọng `numberOfAttempt`
-- `studentUuid` được lấy từ JWT
+- `studentUuid` được lấy từ claim `user.id` trong `access token`
 
 ### 4.2. Rule random câu hỏi theo group
 
@@ -207,7 +216,7 @@ Nếu `exam.endTime` là `null`, hệ thống dùng:
 
 ### Mô tả luồng
 
-Học sinh bắt đầu làm bài -> lấy `studentUuid` từ JWT -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
+Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` trong `access token` -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
 
 ### Input format
 
@@ -258,7 +267,7 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ JWT -> kiểm tra 
 
 #### `400 Bad Request`
 
-- `Student uuid is missing from JWT`
+- `User id is missing from JWT`
 - `Exam not found with id: {examUuid}`
 - `Exam is not available for attempt`
 - `Exam has not started yet`
@@ -268,7 +277,7 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ JWT -> kiểm tra 
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -343,7 +352,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -359,7 +368,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 ### Mô tả luồng
 
-Nhận các tham số filter -> lấy `studentUuid` từ JWT -> query danh sách attempt của học sinh -> nếu có `examUuid` thì lọc theo đề -> auto-submit mềm các attempt đã quá hạn trước khi build summary -> trả kết quả phân trang
+Nhận các tham số filter -> lấy `studentUuid` từ claim `user.id` trong `access token` -> query danh sách attempt của học sinh -> nếu có `examUuid` thì lọc theo đề -> auto-submit mềm các attempt đã quá hạn trước khi build summary -> trả kết quả phân trang
 
 ### Input format
 
@@ -397,12 +406,12 @@ Ví dụ item summary:
 
 #### `400 Bad Request`
 
-- `Student uuid is missing from JWT`
+- `User id is missing from JWT`
 - `Exam not found with id: {examUuid}`
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -467,7 +476,7 @@ Trả `ResExamAttemptDTO` giống API lấy chi tiết attempt.
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 
@@ -527,7 +536,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 #### `403 Forbidden`
 
-- khi JWT không đủ quyền truy cập
+- khi `access token` không hợp lệ hoặc không đủ quyền truy cập
 
 #### `500 Internal Server Error`
 

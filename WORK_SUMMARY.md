@@ -23,6 +23,8 @@ Mình đã triển khai phần lõi của `ExamService` theo đúng hướng mic
 - chuẩn hóa cấu trúc service cho `ExamService`
 - dùng `OAuth2 Resource Server` để validate JWT
 - không tự tạo token trong service này
+- backend hiện nhận `access token` từ `Management Service`
+- user hiện tại được đọc từ claim `user.id`
 - bật JPA auditing
 - dựng response wrapper và exception handling
 - externalize cấu hình bằng biến môi trường `EXAMSERVICE_*`
@@ -182,7 +184,7 @@ Các file liên quan:
 - chỉ cho start attempt khi đề ở trạng thái `PUBLISHED`
 - kiểm tra thời gian mở và đóng đề
 - kiểm tra số lần làm tối đa
-- lấy `studentUuid` từ JWT
+- lấy `studentUuid` từ claim `user.id` trong `access token`
 - mỗi lần đổi đáp án đều insert thêm một bản ghi `StudentAnswer`
 - khi submit, tạo `final answer`
 - chấm điểm theo `final answer`
