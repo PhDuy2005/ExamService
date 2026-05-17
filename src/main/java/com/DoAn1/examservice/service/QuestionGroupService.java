@@ -225,7 +225,7 @@ public class QuestionGroupService {
     private UUID resolveCurrentUserUuid() {
         return SecurityUtil.getCurrentUserUuid()
                 .map(UUID::fromString)
-                .orElseGet(com.DoAn1.examservice.util.UuidV7Generator::generate);
+                .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
     private String normalizeTopic(String topic) {

@@ -347,7 +347,7 @@ public class ExamService {
     private UUID resolveCurrentUserUuid() {
         return SecurityUtil.getCurrentUserUuid()
                 .map(UUID::fromString)
-                .orElseGet(UuidV7Generator::generate);
+                .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
     private ResExamDTO buildResponse(Exam exam) {

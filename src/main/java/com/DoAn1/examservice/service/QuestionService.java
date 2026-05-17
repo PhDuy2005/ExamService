@@ -316,7 +316,7 @@ public class QuestionService {
     private UUID resolveCurrentUserUuid() {
         return SecurityUtil.getCurrentUserUuid()
                 .map(UUID::fromString)
-                .orElseGet(UuidV7Generator::generate);
+                .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
     private ResQuestionDTO buildResponse(Question question) {

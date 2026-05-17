@@ -1,5 +1,6 @@
 package com.DoAn1.examservice.util;
 
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.security.core.Authentication;
@@ -30,7 +31,17 @@ public final class SecurityUtil {
         }
         Object principal = authentication.getPrincipal();
         if (principal instanceof Jwt jwt) {
-            return Optional.ofNullable(jwt.getClaimAsString("uuid"));
+            Map<String, Object> userClaim = jwt.getClaimAsMap("user");
+            if (userClaim == null) {
+                return Optional.empty();
+            }
+
+            Object userId = userClaim.get("id");
+            if (userId == null) {
+                return Optional.empty();
+            }
+
+            return Optional.of(userId.toString());
         }
         return Optional.empty();
     }
