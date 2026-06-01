@@ -39,6 +39,9 @@ public class Exam extends AuditableEntity {
     @Column(nullable = false)
     private Long gradeId;
 
+    @Column(length = 20)
+    private String schoolYear;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private ExamType examType;

@@ -19,6 +19,7 @@ public class ResExamDTO {
     private UUID examUuid;
     private String examName;
     private Long gradeId;
+    private String schoolYear;
     private ExamType examType;
     private Instant startTime;
     private Instant endTime;

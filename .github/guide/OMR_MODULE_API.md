@@ -1,4 +1,4 @@
-# OMR Module API
+﻿# OMR Module API
 
 ## 1. Mục đích module
 
@@ -6,6 +6,7 @@ Module `OMR` phục vụ luồng chấm bài giấy:
 
 - tạo bản in đề có `paperCode`
 - lưu snapshot câu hỏi đúng với bản in
+- nhận file PDF bài làm từ user và tạo job chấm OMR bất đồng bộ
 - nhận dữ liệu scan từ `ScoringService`
 - tự tạo `ExamAttempt` dạng `OMR_IMPORT`
 - lưu đáp án và chấm điểm mà không cần client học sinh start attempt
@@ -81,7 +82,122 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
 
 ---
 
-## 4. API import OMR data
+## 4. API tạo OMR scoring job từ PDF
+
+### Đường dẫn
+
+`POST /api/v1/omr/scoring-jobs`
+
+### Mô tả luồng
+
+User upload file PDF chứa nhiều bài làm trong cùng một exam -> ES validate `examUuid` tồn tại -> validate file là PDF -> lưu file vào storage -> đọc số trang PDF -> tạo `OmrScoringJob` trạng thái `PROCESSING` -> trả `202 Accepted` với `jobUuid`, `pageCount`, danh sách kết quả rỗng -> ES xử lý async và sẽ gọi SS qua gRPC server streaming khi proto/stub được tích hợp.
+
+### Input format
+
+`multipart/form-data`
+
+```text
+file: file PDF bài làm OMR
+examUuid: 018f4a60-12ab-7a11-a9d1-7c5d5b5b0001
+```
+
+`paperCode` và `studentCode` không nằm ở request tạo job vì một file PDF có thể chứa nhiều bài làm của nhiều học sinh, mỗi bài có thể dùng mã đề khác nhau. Các thông tin này sẽ được lấy từ kết quả extract của `ScoringService` cho từng bài làm. `schoolYear` không do SS extract; ES lấy từ `Exam.schoolYear` theo `examUuid` và snapshot vào `OmrScoringJob`.
+
+### Output format
+
+```json
+{
+  "statusCode": 202,
+  "message": "Create OMR scoring job",
+  "data": {
+    "jobUuid": "uuid",
+    "examUuid": "uuid",
+    "schoolYear": "2025-2026",
+    "status": "PROCESSING",
+    "pageCount": 4,
+    "rawImageUrl": "/storage/omr/raw/1717250000000-scan.pdf",
+    "scoredImageUrl": null,
+    "resultCount": 0,
+    "completedCount": 0,
+    "failedCount": 0,
+    "results": [],
+    "errorMessage": null,
+    "createdAt": "2026-06-01T10:00:00Z",
+    "updatedAt": "2026-06-01T10:00:00Z"
+  }
+}
+```
+
+### Exception có thể trả về
+
+- `PDF file is required`
+- `Only PDF file is allowed`
+- `Invalid file type based on MIME type. Only application/pdf is allowed`
+- `Cannot read PDF page count`
+- `Exam id is required`
+- `Exam not found with id: {examUuid}`
+- `Exam school year is required for OMR scoring job`
+- các lỗi lưu file từ `FileService`
+
+---
+
+## 5. API lấy OMR scoring job
+
+### Đường dẫn
+
+`GET /api/v1/omr/scoring-jobs/{jobUuid}`
+
+### Mô tả luồng
+
+Frontend dùng `jobUuid` để polling -> ES tìm `OmrScoringJob` -> trả trạng thái hiện tại, `pageCount`, file URL và danh sách kết quả con. Mỗi kết quả con tương ứng một bài làm được SS extract, có `paperCode`, `studentCode`, `schoolYear`, `studentUuid`, `attemptUuid`, `score` riêng. Trong đó `schoolYear` lấy từ `OmrScoringJob/Exam`, còn `studentUuid` chỉ có sau khi ES resolve `studentCode + schoolYear` sang `userUuid` qua Management Service.
+
+### Output format
+
+```json
+{
+  "statusCode": 200,
+  "message": "Get OMR scoring job",
+  "data": {
+    "jobUuid": "uuid",
+    "examUuid": "uuid",
+    "schoolYear": "2025-2026",
+    "status": "PROCESSING | EXTRACTED | IMPORTING | COMPLETED | FAILED",
+    "pageCount": 4,
+    "rawImageUrl": "/storage/omr/raw/1717250000000-scan.pdf",
+    "scoredImageUrl": null,
+    "resultCount": 2,
+    "completedCount": 1,
+    "failedCount": 0,
+    "results": [
+      {
+        "jobResultUuid": "uuid",
+        "pageNumber": 1,
+        "paperCode": "M001",
+        "studentCode": "12345",
+        "schoolYear": "2025-2026",
+        "studentUuid": "uuid",
+        "attemptUuid": "uuid",
+        "status": "COMPLETED",
+        "score": 8.5,
+        "rawImageUrl": "/storage/omr/raw/page-1.pdf",
+        "scoredImageUrl": "/storage/omr/scored/page-1.jpg",
+        "errorMessage": null
+      }
+    ],
+    "errorMessage": null,
+    "createdAt": "2026-06-01T10:00:00Z",
+    "updatedAt": "2026-06-01T10:00:00Z"
+  }
+}
+```
+
+### Exception có thể trả về
+
+- `OMR scoring job not found with id: {jobUuid}`
+
+---
+
+## 6. API import OMR data
 
 ### Đường dẫn
 
@@ -166,7 +282,7 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
 
 ---
 
-## 5. Quy ước sections
+## 7. Quy ước sections
 
 `sections` chia dữ liệu OMR thành 3 phần đúng với layout phiếu:
 
@@ -223,7 +339,7 @@ Ví dụ:
 
 ---
 
-## 6. Quy ước rawAnswer
+## 8. Quy ước rawAnswer
 
 ### MCQ
 
@@ -268,7 +384,7 @@ Nếu `normalizedAnswer` có `M`, câu `SAQ` thực tế sẽ không khớp đá
 
 ---
 
-## 7. Ghi chú nghiệp vụ
+## 9. Ghi chú nghiệp vụ
 
 - OMR không dùng `POST /api/v1/student/exams/{examUuid}/attempts`
 - `attemptUuid` được `ExamService` tự tạo trong lúc import OMR
@@ -276,3 +392,8 @@ Nếu `normalizedAnswer` có `M`, câu `SAQ` thực tế sẽ không khớp đá
 - `ExamPaper` là snapshot bản in, giúp `sectionQuestionNumber` trong từng section map chính xác về `questionUuid`
 - nếu đề có group random, random xảy ra khi tạo `ExamPaper`, không xảy ra khi import OMR
 - `OmrImport` lưu lại payload scan và attempt được tạo để phục vụ audit/debug
+
+
+
+
+

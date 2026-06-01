@@ -247,6 +247,7 @@ Lưu thông tin đề kiểm tra / bài tập.
 | `exam_uuid`            | UUID                 |       Có | Khóa chính của đề                      |
 | `exam_name`            | VARCHAR              |       Có | Tên đề kiểm tra / bài tập              |
 | `grade_id`             | BIGINT / LONG        |       Có | Khối/lớp mà đề áp dụng                 |
+| `school_year`          | VARCHAR(20)          |       Có | Năm học của đề, dùng để resolve học sinh từ `student_code` khi import OMR |
 | `exam_type`            | VARCHAR(20)          |       Có | Loại đề                                |
 | `start_time`           | DATETIME / TIMESTAMP |    Không | Thời điểm bắt đầu cho phép làm bài     |
 | `end_time`             | DATETIME / TIMESTAMP |    Không | Thời điểm kết thúc cho phép làm bài    |

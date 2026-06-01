@@ -137,6 +137,7 @@ public class ExamService {
     private void applyExamData(Exam exam, ReqCreateExamDTO request) {
         exam.setExamName(request.getExamName().trim());
         exam.setGradeId(request.getGradeId());
+        exam.setSchoolYear(request.getSchoolYear() != null ? request.getSchoolYear().trim() : null);
         exam.setExamType(request.getExamType());
         exam.setStartTime(request.getStartTime());
         exam.setEndTime(request.getEndTime());
@@ -431,6 +432,7 @@ public class ExamService {
                 .examUuid(exam.getExamUuid())
                 .examName(exam.getExamName())
                 .gradeId(exam.getGradeId())
+                .schoolYear(exam.getSchoolYear())
                 .examType(exam.getExamType())
                 .startTime(exam.getStartTime())
                 .endTime(exam.getEndTime())

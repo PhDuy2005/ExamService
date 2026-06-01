@@ -1,4 +1,4 @@
-# Exam Module API
+﻿# Exam Module API
 
 ## 1. Mục đích module
 
@@ -94,6 +94,7 @@ Hoặc với lỗi validation:
   "examUuid": "uuid",
   "examName": "string",
   "gradeId": 12,
+  "schoolYear": "2025-2026",
   "examType": "QUIZ | HOMEWORK | MOCK_TEST | OFFICIAL_TEST",
   "startTime": "2026-05-17T10:00:00Z | null",
   "endTime": "2026-05-17T11:00:00Z | null",
@@ -260,6 +261,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 {
   "examName": "Đề kiểm tra Toán 15 phút",
   "gradeId": 12,
+  "schoolYear": "2025-2026",
   "examType": "QUIZ",
   "startTime": "2026-05-18T01:00:00Z",
   "endTime": "2026-05-18T01:15:00Z",
@@ -329,6 +331,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "gradeId": 12,
+    "schoolYear": "2025-2026",
     "examType": "QUIZ",
     "startTime": "2026-05-18T01:00:00Z",
     "endTime": "2026-05-18T01:15:00Z",
@@ -431,6 +434,7 @@ Ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "string",
     "gradeId": 12,
+    "schoolYear": "2025-2026",
     "questionSummary": {
       "mcqCount": 10,
       "tfqCount": 4,

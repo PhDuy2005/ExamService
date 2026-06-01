@@ -44,6 +44,16 @@ public class FileService {
         return finalName;
     }
 
+    public String buildStorageUrl(String folder, String fileName) {
+        String cleanFolder = StringUtils.cleanPath(folder.trim()).replace("\\", "/");
+        String cleanFileName = StringUtils.cleanPath(fileName);
+        if (cleanFolder.startsWith("/") || cleanFolder.contains("..")
+                || cleanFileName.contains("..") || !StringUtils.hasText(cleanFileName)) {
+            throw new StorageException("Invalid storage path");
+        }
+        return "/storage/" + cleanFolder + "/" + cleanFileName;
+    }
+
     private Path resolveFolder(String folder) {
         if (!StringUtils.hasText(folder)) {
             throw new StorageException("Folder is required");
