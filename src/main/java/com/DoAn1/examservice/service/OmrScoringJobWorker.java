@@ -22,6 +22,8 @@ import com.DoAn1.examservice.repository.OmrScoringJobResultRepository;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import lombok.extern.slf4j.Slf4j;
+import management.v1.StudentResolver;
+import management.v1.StudentResolverServiceGrpc;
 import scoring.normal.v1.ScoringNormal;
 import scoring.normal.v1.ScoringNormalServiceGrpc;
 
@@ -34,6 +36,12 @@ public class OmrScoringJobWorker {
 
     @Value("${examservice.scoring-service.port:50051}")
     private Integer scoringServicePort;
+
+    @Value("${examservice.management-service.host:localhost}")
+    private String managementServiceHost;
+
+    @Value("${examservice.management-service.port:9092}")
+    private Integer managementServicePort;
 
     private final OmrScoringJobRepository omrScoringJobRepository;
     private final OmrScoringJobResultRepository omrScoringJobResultRepository;
@@ -208,13 +216,35 @@ public class OmrScoringJobWorker {
             throw new IllegalArgumentException("School year is required");
         }
 
-        // TODO: Call Management Service gRPC to resolve studentCode + schoolYear ->
-        // userUuid.
-        // ES must not generate a fallback UUID here. If MS cannot resolve the user,
-        // this OMR result must be marked as FAILED and no ExamAttempt should be
-        // created.
-        throw new UnsupportedOperationException(
-                "Resolve studentCode + schoolYear to userUuid via Management Service gRPC is not implemented");
+        ManagedChannel channel = ManagedChannelBuilder
+                .forAddress(managementServiceHost, managementServicePort)
+                .usePlaintext()
+                .build();
+
+        try {
+            StudentResolverServiceGrpc.StudentResolverServiceBlockingStub stub =
+                    StudentResolverServiceGrpc.newBlockingStub(channel);
+            StudentResolver.ResolveStudentsRequest request = StudentResolver.ResolveStudentsRequest.newBuilder()
+                    .setSchoolYear(schoolYear)
+                    .addStudentIds(studentCode)
+                    .build();
+            StudentResolver.ResolveStudentsResponse response = stub.resolveStudents(request);
+
+            if (response.getUnresolvedStudentIdsList().contains(studentCode)) {
+                throw new IllegalArgumentException("Student code could not be resolved: " + studentCode);
+            }
+
+            return response.getStudentsList().stream()
+                    .filter(student -> studentCode.equals(student.getStudentId()))
+                    .findFirst()
+                    .map(StudentResolver.ResolvedStudent::getUserUuid)
+                    .filter(this::hasText)
+                    .map(UUID::fromString)
+                    .orElseThrow(() -> new IllegalArgumentException(
+                            "Student code could not be resolved: " + studentCode));
+        } finally {
+            channel.shutdown();
+        }
     }
 
     private Instant parseInstant(String value) {
