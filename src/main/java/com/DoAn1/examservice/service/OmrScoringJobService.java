@@ -161,6 +161,7 @@ public class OmrScoringJobService {
                 .paperCode(result.getPaperCode())
                 .studentCode(result.getStudentCode())
                 .schoolYear(result.getSchoolYear())
+                .studentFullname(result.getStudentFullname())
                 .studentUuid(result.getStudentUuid())
                 .attemptUuid(result.getAttemptUuid())
                 .status(result.getStatus())

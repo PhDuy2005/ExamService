@@ -57,7 +57,7 @@ ES nhận n response từ SS
  ↓
 ES gom extracted data thành nhiều submission, mỗi submission có paperCode, studentCode, sections.mcq, sections.tfq, sections.saq
  ↓
-ES resolve studentCode + schoolYear sang userUuid qua MS gRPC
+ES resolve studentCode + schoolYear sang userUuid và fullname qua MS gRPC
  ↓
 ES cập nhật OmrScoringJob(status=EXTRACTED/IMPORTING)
  ↓
@@ -297,6 +297,7 @@ GET /api/v1/omr/scoring-jobs/{jobUuid}
         "pageNumber": 1,
         "paperCode": "M001",
         "studentCode": "12345",
+        "studentFullname": "Nguyễn Văn A",
         "studentUuid": "uuid",
         "attemptUuid": "uuid",
         "status": "COMPLETED",
@@ -310,6 +311,7 @@ GET /api/v1/omr/scoring-jobs/{jobUuid}
         "pageNumber": 2,
         "paperCode": "M002",
         "studentCode": "54321",
+        "studentFullname": "Nguyễn Văn A",
         "studentUuid": "uuid",
         "attemptUuid": "uuid",
         "status": "COMPLETED",

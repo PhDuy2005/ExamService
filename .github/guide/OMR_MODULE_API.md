@@ -149,7 +149,7 @@ examUuid: 018f4a60-12ab-7a11-a9d1-7c5d5b5b0001
 
 ### Mô tả luồng
 
-Frontend dùng `jobUuid` để polling -> ES tìm `OmrScoringJob` -> trả trạng thái hiện tại, `pageCount`, file URL và danh sách kết quả con. Mỗi kết quả con tương ứng một bài làm được SS extract, có `paperCode`, `studentCode`, `schoolYear`, `studentUuid`, `attemptUuid`, `score` riêng. Trong đó `schoolYear` lấy từ `OmrScoringJob/Exam`, còn `studentUuid` chỉ có sau khi ES resolve `studentCode + schoolYear` sang `userUuid` qua Management Service.
+Frontend dùng `jobUuid` để polling -> ES tìm `OmrScoringJob` -> trả trạng thái hiện tại, `pageCount`, file URL và danh sách kết quả con. Mỗi kết quả con tương ứng một bài làm được SS extract, có `paperCode`, `studentCode`, `studentFullname`, `schoolYear`, `studentUuid`, `attemptUuid`, `score` riêng. Trong đó `schoolYear` lấy từ `OmrScoringJob/Exam`, còn `studentUuid` chỉ có sau khi ES resolve `studentCode + schoolYear` sang `userUuid` qua Management Service.
 
 ### Output format
 
@@ -174,6 +174,7 @@ Frontend dùng `jobUuid` để polling -> ES tìm `OmrScoringJob` -> trả trạ
         "pageNumber": 1,
         "paperCode": "M001",
         "studentCode": "12345",
+        "studentFullname": "Nguyễn Văn A",
         "schoolYear": "2025-2026",
         "studentUuid": "uuid",
         "attemptUuid": "uuid",
@@ -214,6 +215,8 @@ Nhận dữ liệu OMR từ `ScoringService` -> tìm `ExamPaper` theo `examUuid 
   "examUuid": "018f4a60-12ab-7a11-a9d1-7c5d5b5b0001",
   "paperCode": "M001",
   "studentUuid": "018f4a61-22cd-7b11-9fd2-7c5d5b5b0002",
+  "studentId": "10013",
+  "studentFullname": "Nguyen Van A",
   "externalSubmissionId": "scoring-service-omr-0001",
   "rawImageUrl": "https://storage.example.com/omr/raw/scan-0001.jpg",
   "scoredImageUrl": "https://storage.example.com/omr/scored/scan-0001.jpg",
@@ -392,6 +395,7 @@ Nếu `normalizedAnswer` có `M`, câu `SAQ` thực tế sẽ không khớp đá
 - `ExamPaper` là snapshot bản in, giúp `sectionQuestionNumber` trong từng section map chính xác về `questionUuid`
 - nếu đề có group random, random xảy ra khi tạo `ExamPaper`, không xảy ra khi import OMR
 - `OmrImport` lưu lại payload scan và attempt được tạo để phục vụ audit/debug
+
 
 
 

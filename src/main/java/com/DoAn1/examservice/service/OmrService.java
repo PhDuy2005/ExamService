@@ -95,6 +95,8 @@ public class OmrService {
         ResExamAttemptDTO attempt = examAttemptService.importOmrAttempt(
                 request.getExamUuid(),
                 request.getStudentUuid(),
+                request.getStudentId(),
+                request.getStudentFullname(),
                 paper.getQuestionSnapshotJson(),
                 rawAnswerByQuestionOrder,
                 request.getRawImageUrl(),

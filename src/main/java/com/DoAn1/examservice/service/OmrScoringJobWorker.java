@@ -112,8 +112,8 @@ public class OmrScoringJobWorker {
 
         try {
             ScoringNormal.ReadOmrPayload payload = response.getData();
-            ReqOmrImportDTO request = buildImportRequest(job, response, payload);
-            ResOmrImportDTO imported = omrService.importOmrData(request);
+            OmrImportRequestContext requestContext = buildImportRequest(job, response, payload);
+            ResOmrImportDTO imported = omrService.importOmrData(requestContext.request());
 
             OmrScoringJobResult result = new OmrScoringJobResult();
             result.setJobUuid(job.getJobUuid());
@@ -121,7 +121,8 @@ public class OmrScoringJobWorker {
             result.setPaperCode(payload.getPaperCode());
             result.setStudentCode(payload.getStudentCode());
             result.setSchoolYear(job.getSchoolYear());
-            result.setStudentUuid(request.getStudentUuid());
+            result.setStudentFullname(requestContext.studentFullname());
+            result.setStudentUuid(requestContext.request().getStudentUuid());
             result.setAttemptUuid(imported.getAttemptUuid());
             result.setStatus(OmrScoringJobResultStatus.COMPLETED);
             result.setScore(imported.getScore());
@@ -143,14 +144,17 @@ public class OmrScoringJobWorker {
         }
     }
 
-    private ReqOmrImportDTO buildImportRequest(
+    private OmrImportRequestContext buildImportRequest(
             OmrScoringJob job,
             ScoringNormal.ReadOmrResponse response,
             ScoringNormal.ReadOmrPayload payload) {
+        ResolvedStudentIdentity studentIdentity = resolveStudentIdentity(payload.getStudentCode(), job.getSchoolYear());
         ReqOmrImportDTO request = new ReqOmrImportDTO();
         request.setExamUuid(job.getExamUuid());
         request.setPaperCode(payload.getPaperCode());
-        request.setStudentUuid(resolveStudentUuid(payload.getStudentCode(), job.getSchoolYear()));
+        request.setStudentUuid(studentIdentity.userUuid());
+        request.setStudentId(studentIdentity.studentId());
+        request.setStudentFullname(studentIdentity.fullname());
         request.setExternalSubmissionId(firstText(
                 payload.getExternalSubmissionId(),
                 job.getJobUuid() + "-page-" + response.getPageNumber()));
@@ -158,7 +162,7 @@ public class OmrScoringJobWorker {
         request.setScoredImageUrl(payload.getScoredImageUrl());
         request.setScannedAt(parseInstant(payload.getScannedAt()));
         request.setSections(buildSections(payload.getSections()));
-        return request;
+        return new OmrImportRequestContext(request, studentIdentity.fullname());
     }
 
     private ReqOmrSectionsDTO buildSections(ScoringNormal.OmrSections sections) {
@@ -208,7 +212,7 @@ public class OmrScoringJobWorker {
         omrScoringJobResultRepository.save(result);
     }
 
-    private UUID resolveStudentUuid(String studentCode, String schoolYear) {
+    private ResolvedStudentIdentity resolveStudentIdentity(String studentCode, String schoolYear) {
         if (!hasText(studentCode)) {
             throw new IllegalArgumentException("Student code is required");
         }
@@ -237,14 +241,22 @@ public class OmrScoringJobWorker {
             return response.getStudentsList().stream()
                     .filter(student -> studentCode.equals(student.getStudentId()))
                     .findFirst()
-                    .map(StudentResolver.ResolvedStudent::getUserUuid)
-                    .filter(this::hasText)
-                    .map(UUID::fromString)
+                    .map(student -> new ResolvedStudentIdentity(
+                            parseUserUuid(student),
+                            student.getStudentId(),
+                            student.getFullname()))
                     .orElseThrow(() -> new IllegalArgumentException(
                             "Student code could not be resolved: " + studentCode));
         } finally {
             channel.shutdown();
         }
+    }
+
+    private UUID parseUserUuid(StudentResolver.ResolvedStudent student) {
+        if (!hasText(student.getUserUuid())) {
+            throw new IllegalArgumentException("Resolved student user uuid is missing: " + student.getStudentId());
+        }
+        return UUID.fromString(student.getUserUuid());
     }
 
     private Instant parseInstant(String value) {
@@ -260,5 +272,11 @@ public class OmrScoringJobWorker {
 
     private boolean hasText(String value) {
         return value != null && !value.isBlank();
+    }
+
+    private record OmrImportRequestContext(ReqOmrImportDTO request, String studentFullname) {
+    }
+
+    private record ResolvedStudentIdentity(UUID userUuid, String studentId, String fullname) {
     }
 }
