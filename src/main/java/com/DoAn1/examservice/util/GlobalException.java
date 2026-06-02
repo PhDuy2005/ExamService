@@ -23,12 +23,17 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import com.DoAn1.examservice.domain.response.RestResponse;
 import com.DoAn1.examservice.exception.IdInvalidException;
 
+import lombok.extern.slf4j.Slf4j;
+
 @RestControllerAdvice
+@Slf4j
 public class GlobalException {
 
     // handle all other exceptions
     @ExceptionHandler(value = Exception.class)
     public ResponseEntity<RestResponse<Object>> handleAllExceptions(Exception ex) {
+        log.error("Unhandled exception captured: type={}, message={}",
+                ex.getClass().getSimpleName(), ex.getMessage(), ex);
         RestResponse<Object> restResponse = new RestResponse<>();
         restResponse.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
         restResponse.setError("An unexpected Internal server error occurred");

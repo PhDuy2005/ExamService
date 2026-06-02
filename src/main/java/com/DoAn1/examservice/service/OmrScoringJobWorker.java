@@ -1,4 +1,4 @@
-﻿package com.DoAn1.examservice.service;
+package com.DoAn1.examservice.service;
 
 import java.time.Instant;
 import java.util.List;
@@ -50,7 +50,8 @@ public class OmrScoringJobWorker {
 
     @Async
     public void processJob(UUID jobUuid) {
-        OmrScoringJob job = omrScoringJobRepository.findById(jobUuid)
+        log.info("Processing OMR scoring job: jobUuid={}", jobUuid);
+        OmrScoringJob job = omrScoringJobRepository.findByJobUuid(jobUuid)
                 .orElseThrow(() -> new IllegalArgumentException("OMR scoring job not found with id: " + jobUuid));
 
         ManagedChannel channel = ManagedChannelBuilder
@@ -59,8 +60,8 @@ public class OmrScoringJobWorker {
                 .build();
 
         try {
-            ScoringNormalServiceGrpc.ScoringNormalServiceBlockingStub stub =
-                    ScoringNormalServiceGrpc.newBlockingStub(channel);
+            ScoringNormalServiceGrpc.ScoringNormalServiceBlockingStub stub = ScoringNormalServiceGrpc
+                    .newBlockingStub(channel);
             ScoringNormal.ReadOmrRequest request = ScoringNormal.ReadOmrRequest.newBuilder()
                     .setRequestId(job.getJobUuid().toString())
                     .setExamUuid(job.getExamUuid().toString())
@@ -68,11 +69,16 @@ public class OmrScoringJobWorker {
                     .setScannedAt(Instant.now().toString())
                     .build();
 
+            log.debug("Calling scoring service for OMR scoring job: jobUuid={}, examUuid={}, pageCount={}",
+                    job.getJobUuid(), job.getExamUuid(), job.getPageCount());
             stub.readOmr(request).forEachRemaining(response -> handleResponse(job, response));
             job.setStatus(OmrScoringJobStatus.COMPLETED);
             omrScoringJobRepository.save(job);
+            log.info("OMR scoring job processed successfully: jobUuid={}, examUuid={}, status={}",
+                    job.getJobUuid(), job.getExamUuid(), job.getStatus());
         } catch (Exception ex) {
-            log.error("Failed to process OMR scoring job {}", jobUuid, ex);
+            log.error("Processing OMR scoring job failed: jobUuid={}, examUuid={}, message={}",
+                    jobUuid, job.getExamUuid(), ex.getMessage(), ex);
             job.setStatus(OmrScoringJobStatus.FAILED);
             job.setErrorMessage(ex.getMessage());
             omrScoringJobRepository.save(job);
@@ -83,11 +89,15 @@ public class OmrScoringJobWorker {
 
     private void handleResponse(OmrScoringJob job, ScoringNormal.ReadOmrResponse response) {
         if (!response.getSuccess()) {
+            log.warn("OMR scoring result rejected by scoring service: jobUuid={}, pageNumber={}, reason={}",
+                    job.getJobUuid(), response.getPageNumber(), response.getErrorMessage());
             saveFailedResult(job, response.getPageNumber(), response.getErrorMessage());
             return;
         }
 
         if (!response.hasData()) {
+            log.warn("OMR scoring result rejected because payload is missing: jobUuid={}, pageNumber={}",
+                    job.getJobUuid(), response.getPageNumber());
             saveFailedResult(job, response.getPageNumber(), "Scoring response data is missing");
             return;
         }
@@ -110,14 +120,17 @@ public class OmrScoringJobWorker {
             result.setRawImageUrl(firstText(payload.getRawImageUrl(), job.getRawImageUrl()));
             result.setScoredImageUrl(payload.getScoredImageUrl());
             omrScoringJobResultRepository.save(result);
+            log.debug(
+                    "OMR scoring result imported successfully: jobUuid={}, pageNumber={}, studentCode={}, attemptUuid={}",
+                    job.getJobUuid(), response.getPageNumber(), payload.getStudentCode(), imported.getAttemptUuid());
 
             if (hasText(payload.getScoredImageUrl())) {
                 job.setScoredImageUrl(payload.getScoredImageUrl());
                 omrScoringJobRepository.save(job);
             }
         } catch (Exception ex) {
-            log.error("Failed to import OMR response for job {} page {}",
-                    job.getJobUuid(), response.getPageNumber(), ex);
+            log.error("Importing OMR scoring result failed: jobUuid={}, pageNumber={}, message={}",
+                    job.getJobUuid(), response.getPageNumber(), ex.getMessage(), ex);
             saveFailedResult(job, response, response.getData(), ex.getMessage());
         }
     }
@@ -195,10 +208,13 @@ public class OmrScoringJobWorker {
             throw new IllegalArgumentException("School year is required");
         }
 
-        // TODO: Call Management Service gRPC to resolve studentCode + schoolYear -> userUuid.
+        // TODO: Call Management Service gRPC to resolve studentCode + schoolYear ->
+        // userUuid.
         // ES must not generate a fallback UUID here. If MS cannot resolve the user,
-        // this OMR result must be marked as FAILED and no ExamAttempt should be created.
-        throw new UnsupportedOperationException("Resolve studentCode + schoolYear to userUuid via Management Service gRPC is not implemented");
+        // this OMR result must be marked as FAILED and no ExamAttempt should be
+        // created.
+        throw new UnsupportedOperationException(
+                "Resolve studentCode + schoolYear to userUuid via Management Service gRPC is not implemented");
     }
 
     private Instant parseInstant(String value) {
@@ -216,4 +232,3 @@ public class OmrScoringJobWorker {
         return value != null && !value.isBlank();
     }
 }
-

@@ -17,8 +17,10 @@ import com.DoAn1.examservice.service.OmrScoringJobService;
 import com.DoAn1.examservice.util.annotation.ApiMessage;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
+@Slf4j
 @RequiredArgsConstructor
 public class OmrScoringJobController {
 
@@ -29,6 +31,8 @@ public class OmrScoringJobController {
     public ResponseEntity<ResOmrScoringJobDTO> createScoringJob(
             @RequestParam(name = "file", required = false) MultipartFile file,
             @RequestParam(name = "examUuid") UUID examUuid) throws IOException {
+        log.info("Create OMR scoring job request received: examUuid={}, originalFileName={}",
+                examUuid, file != null ? file.getOriginalFilename() : null);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(omrScoringJobService.createScoringJob(file, examUuid));
     }
@@ -36,6 +40,7 @@ public class OmrScoringJobController {
     @GetMapping("/api/v1/omr/scoring-jobs/{jobUuid}")
     @ApiMessage("Get OMR scoring job")
     public ResOmrScoringJobDTO getScoringJob(@PathVariable(name = "jobUuid") UUID jobUuid) {
+        log.info("Get OMR scoring job request received: jobUuid={}", jobUuid);
         return omrScoringJobService.getScoringJob(jobUuid);
     }
 }
