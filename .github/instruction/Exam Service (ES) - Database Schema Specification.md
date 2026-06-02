@@ -433,6 +433,7 @@ Lưu thông tin một lần làm bài của học sinh.
 | `status`             | VARCHAR              |       Có | Trạng thái lần làm bài                        |
 | `score`              | DECIMAL / NUMERIC    |    Không | Điểm đạt được                                 |
 | `is_auto_submitted`  | BOOLEAN              |       Có | Có phải hệ thống tự nộp bài hay không         |
+| `violation_count`    | INT                  |    Không | Số sự kiện giám sát được snapshot khi attempt hoàn thành |
 | `submit_source`      | VARCHAR(20)          |       Có | Nguồn nộp bài                                 |
 | `created_at`         | DATETIME / TIMESTAMP |       Có | Thời điểm tạo attempt                         |
 

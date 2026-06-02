@@ -21,5 +21,6 @@ public class ResStudentExamResultDTO {
     private SubmitSource submitSource;
     private String paperCode;
     private BigDecimal totalScore;
+    private Integer violationCount;
     private Map<QuestionType, BigDecimal> sectionScores;
 }

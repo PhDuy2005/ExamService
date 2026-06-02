@@ -249,6 +249,7 @@ public class DashboardService {
                         .submitSource(context.attempt().getSubmitSource())
                         .paperCode(paperCodeByAttemptUuid.get(context.attempt().getAttemptUuid()))
                         .totalScore(context.attempt().getScore())
+                        .violationCount(nullSafeViolationCount(context.attempt()))
                         .sectionScores(context.sectionScores())
                         .build())
                 .toList();
@@ -434,15 +435,15 @@ public class DashboardService {
 
     private void addResultSummarySheet(Workbook workbook, DashboardData data) {
         Sheet sheet = workbook.createSheet("Kết quả");
-        writeHeader(workbook, sheet, 0, List.of("SID", "Họ tên", "User UUID", "Nguồn", "Mã đề giấy", "Tổng điểm", "Điểm MCQ", "Điểm TFQ", "Điểm SAQ"));
+        writeHeader(workbook, sheet, 0, List.of("SID", "Họ tên", "User UUID", "Nguồn", "Mã đề giấy", "Tổng điểm", "Số vi phạm", "Điểm MCQ", "Điểm TFQ", "Điểm SAQ"));
         int rowIndex = 1;
         for (ResStudentExamResultDTO student : data.studentResults()) {
             Row row = sheet.createRow(rowIndex++);
             writeCells(row, student.getStudentId(), student.getFullname(), student.getUserUuid(), student.getSubmitSource(), student.getPaperCode(),
-                    student.getTotalScore(), student.getSectionScores().get(QuestionType.MCQ), student.getSectionScores().get(QuestionType.TFQ),
+                    student.getTotalScore(), student.getViolationCount(), student.getSectionScores().get(QuestionType.MCQ), student.getSectionScores().get(QuestionType.TFQ),
                     student.getSectionScores().get(QuestionType.SAQ));
         }
-        autoSize(sheet, 9);
+        autoSize(sheet, 10);
     }
 
     private void addAnswerDetailSheet(Workbook workbook, DashboardData data) {
@@ -653,6 +654,10 @@ public class DashboardService {
 
     private BigDecimal nullSafeScore(BigDecimal value) {
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private Integer nullSafeViolationCount(ExamAttempt attempt) {
+        return attempt.getViolationCount() == null ? 0 : attempt.getViolationCount();
     }
 
     private record DashboardData(

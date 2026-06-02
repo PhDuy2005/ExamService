@@ -26,6 +26,7 @@ public class ResExamAttemptSummaryDTO {
     private AttemptStatus status;
     private BigDecimal score;
     private Boolean isAutoSubmitted;
+    private Integer violationCount;
     private String rawImageUrl;
     private String scoredImageUrl;
 }

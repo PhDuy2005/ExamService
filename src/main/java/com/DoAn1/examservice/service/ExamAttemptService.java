@@ -45,6 +45,7 @@ import com.DoAn1.examservice.domain.responseDTO.attempt.ResExamAttemptDTO;
 import com.DoAn1.examservice.domain.responseDTO.attempt.ResExamAttemptSummaryDTO;
 import com.DoAn1.examservice.exception.IdInvalidException;
 import com.DoAn1.examservice.repository.ExamAttemptRepository;
+import com.DoAn1.examservice.repository.ExamProctoringEventRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupItemRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupRepository;
 import com.DoAn1.examservice.repository.ExamQuestionRepository;
@@ -76,6 +77,7 @@ public class ExamAttemptService {
     private final ExamQuestionGroupRepository examQuestionGroupRepository;
     private final ExamQuestionGroupItemRepository examQuestionGroupItemRepository;
     private final ExamAttemptRepository examAttemptRepository;
+    private final ExamProctoringEventRepository examProctoringEventRepository;
     private final StudentAnswerRepository studentAnswerRepository;
     private final QuestionRepository questionRepository;
     private final QuestionMcOptionRepository questionMcOptionRepository;
@@ -394,6 +396,7 @@ public class ExamAttemptService {
                 .status(attempt.getStatus())
                 .score(attempt.getScore())
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
                 .scoredImageUrl(attempt.getScoredImageUrl())
                 .questions(questions)
@@ -414,6 +417,7 @@ public class ExamAttemptService {
                 .status(attempt.getStatus())
                 .score(attempt.getScore())
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
                 .scoredImageUrl(attempt.getScoredImageUrl())
                 .build();
@@ -505,7 +509,12 @@ public class ExamAttemptService {
         attempt.setStatus(AttemptStatus.SCORED);
         attempt.setScore(totalScore);
         attempt.setIsAutoSubmitted(autoSubmitted);
+        attempt.setViolationCount((int) examProctoringEventRepository.countByAttemptUuid(attempt.getAttemptUuid()));
         return examAttemptRepository.save(attempt);
+    }
+
+    private Integer nullSafeViolationCount(ExamAttempt attempt) {
+        return attempt.getViolationCount() == null ? 0 : attempt.getViolationCount();
     }
 
     private boolean isAttemptExpired(ExamAttempt attempt, Exam exam, Instant now) {

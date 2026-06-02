@@ -58,6 +58,7 @@ Nhận `examUuid` -> lấy exam -> lấy các attempt đã có điểm -> đọc
       "submitSource": "WEB",
       "paperCode": null,
       "totalScore": 8.5,
+      "violationCount": 2,
       "sectionScores": {
         "MCQ": 3.0,
         "TFQ": 2.5,
@@ -75,6 +76,19 @@ Có các sheet:
 - `Thông tin chung`
 - `Kết quả`
 - `Chi tiết đáp án`
+
+Sheet `Kết quả` có các cột:
+
+- `SID`
+- `Họ tên`
+- `User UUID`
+- `Nguồn`
+- `Mã đề giấy`
+- `Tổng điểm`
+- `Số vi phạm`
+- `Điểm MCQ`
+- `Điểm TFQ`
+- `Điểm SAQ`
 
 Sheet `Chi tiết đáp án` có các cột:
 
