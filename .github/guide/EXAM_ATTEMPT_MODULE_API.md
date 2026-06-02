@@ -1,4 +1,4 @@
-# Exam Attempt Module API
+﻿# Exam Attempt Module API
 
 ## 1. Mục đích module
 
@@ -32,6 +32,7 @@ Tất cả API thành công của module này đều được bọc bởi `RestR
 - backend xác định học sinh hiện tại từ claim:
   - `user.id`
 - field `studentUuid` trong response là id của user hiện tại được đọc từ `access token`
+- field `studentId` và `studentFullname` được snapshot từ JWT. Với role `STUDENT`, `studentId = user.studentId` và `studentFullname = user.fullName`. Với role `TEACHER`, `TA`, `COLAB_TEACHER`, `MANAGER`, backend cho phép start attempt để test tính năng, `studentId = null`, `studentFullname = "NOT_STUDENT_" + user.fullName`.
 
 ### Format thành công chung
 
@@ -85,6 +86,8 @@ Ví dụ:
   "examUuid": "uuid",
   "examName": "string",
   "studentUuid": "uuid",
+  "studentId": "10013",
+  "studentFullname": "Nguyen Van A",
   "attemptNo": 1,
   "startedAt": "2026-05-17T10:00:00Z",
   "submittedAt": null,
@@ -171,6 +174,8 @@ Ví dụ:
 - nếu `endTime` có giá trị, không được start sau thời điểm đó
 - phải tôn trọng `numberOfAttempt`
 - `studentUuid` được lấy từ claim `user.id` trong `access token`
+- nếu role là `STUDENT`, `studentId` được lấy từ claim `user.studentId` và `studentFullname` lấy từ `user.fullName`
+- nếu role là `TEACHER`, `TA`, `COLAB_TEACHER`, `MANAGER`, `studentId = null`, `studentFullname = "NOT_STUDENT_" + user.fullName`
 
 ### 4.2. Rule random câu hỏi theo group
 
@@ -243,7 +248,7 @@ Nếu `exam.endTime` là `null`, hệ thống dùng:
 
 ### Mô tả luồng
 
-Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` trong `access token` -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
+Người dùng được phép bắt đầu làm bài -> lấy `studentUuid`, `studentId`, `studentFullname` từ JWT theo role -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
 
 ### Input format
 
@@ -261,6 +266,8 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": null,
@@ -297,6 +304,10 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
 #### `400 Bad Request`
 
 - `User id is missing from JWT`
+- `Role name is missing from JWT`
+- `User full name is missing from JWT`
+- `Student id is missing from JWT`
+- `Current role is not allowed to start an exam attempt`
 - `Exam not found with id: {examUuid}`
 - `Exam is not available for attempt`
 - `Exam has not started yet`
@@ -341,6 +352,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": null,
@@ -440,6 +453,10 @@ Ví dụ item summary:
 #### `400 Bad Request`
 
 - `User id is missing from JWT`
+- `Role name is missing from JWT`
+- `User full name is missing from JWT`
+- `Student id is missing from JWT`
+- `Current role is not allowed to start an exam attempt`
 - `Exam not found with id: {examUuid}`
 
 #### `403 Forbidden`
@@ -545,6 +562,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": "2026-05-17T10:14:58Z",
@@ -870,3 +889,4 @@ Frontend có thể đọc lại:
 - gửi batch rỗng
 - gửi quá 100 event
 - gửi event cho attempt không thuộc học sinh hiện tại
+

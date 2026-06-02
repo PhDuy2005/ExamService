@@ -424,6 +424,8 @@ Lưu thông tin một lần làm bài của học sinh.
 | `attempt_uuid`       | UUID                 |       Có | Khóa chính của lần làm bài                    |
 | `exam_uuid`          | UUID                 |       Có | Tham chiếu đến `EXAM.exam_uuid`               |
 | `student_uuid`       | UUID                 |       Có | Học sinh thực hiện lần làm bài                |
+| `student_id`         | VARCHAR(20)          |    Không | SID/studentId snapshot tại thời điểm tạo attempt |
+| `student_fullname`   | VARCHAR(255)         |    Không | Tên học sinh snapshot tại thời điểm tạo attempt |
 | `attempt_no`         | INT                  |       Có | Số thứ tự lần làm bài của học sinh đối với đề |
 | `started_at`         | DATETIME / TIMESTAMP |    Không | Thời điểm bắt đầu làm bài                     |
 | `submitted_at`       | DATETIME / TIMESTAMP |    Không | Thời điểm nộp bài                             |

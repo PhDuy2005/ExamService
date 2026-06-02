@@ -46,6 +46,9 @@ public class OmrScoringJobResult {
     @Column(length = 20)
     private String schoolYear;
 
+    @Column(length = 255)
+    private String studentFullname;
+
     private UUID studentUuid;
 
     private UUID attemptUuid;

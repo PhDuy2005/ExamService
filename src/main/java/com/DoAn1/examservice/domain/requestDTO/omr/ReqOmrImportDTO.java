@@ -22,6 +22,10 @@ public class ReqOmrImportDTO {
     @NotNull(message = "Student id is required")
     private UUID studentUuid;
 
+    private String studentId;
+
+    private String studentFullname;
+
     private String externalSubmissionId;
 
     private String rawImageUrl;

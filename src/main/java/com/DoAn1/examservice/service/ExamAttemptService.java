@@ -65,6 +65,12 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ExamAttemptService {
 
+    private static final Set<String> NON_STUDENT_ATTEMPT_ROLES = Set.of(
+            "TEACHER",
+            "TA",
+            "COLAB_TEACHER",
+            "MANAGER");
+
     private final ExamRepository examRepository;
     private final ExamQuestionRepository examQuestionRepository;
     private final ExamQuestionGroupRepository examQuestionGroupRepository;
@@ -79,7 +85,8 @@ public class ExamAttemptService {
 
     @Transactional
     public ResExamAttemptDTO startAttempt(UUID examUuid) {
-        UUID studentUuid = resolveCurrentStudentUuid();
+        StudentIdentity studentIdentity = resolveCurrentStudentIdentity();
+        UUID studentUuid = studentIdentity.studentUuid();
         Exam exam = findExamById(examUuid);
         validateExamAttemptCanStart(exam, studentUuid);
 
@@ -92,6 +99,8 @@ public class ExamAttemptService {
         ExamAttempt attempt = new ExamAttempt();
         attempt.setExamUuid(examUuid);
         attempt.setStudentUuid(studentUuid);
+        attempt.setStudentId(studentIdentity.studentId());
+        attempt.setStudentFullname(studentIdentity.studentFullname());
         attempt.setAttemptNo(nextAttemptNo);
         attempt.setStartedAt(Instant.now());
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
@@ -180,6 +189,8 @@ public class ExamAttemptService {
     public ResExamAttemptDTO importOmrAttempt(
             UUID examUuid,
             UUID studentUuid,
+            String studentId,
+            String studentFullname,
             String questionSnapshotJson,
             Map<Integer, String> rawAnswerByQuestionOrder,
             String rawImageUrl,
@@ -203,6 +214,8 @@ public class ExamAttemptService {
         ExamAttempt attempt = new ExamAttempt();
         attempt.setExamUuid(examUuid);
         attempt.setStudentUuid(studentUuid);
+        attempt.setStudentId(studentId);
+        attempt.setStudentFullname(studentFullname);
         attempt.setAttemptNo(nextAttemptNo);
         attempt.setStartedAt(Instant.now());
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
@@ -372,6 +385,8 @@ public class ExamAttemptService {
                 .examUuid(attempt.getExamUuid())
                 .examName(exam.getExamName())
                 .studentUuid(attempt.getStudentUuid())
+                .studentId(attempt.getStudentId())
+                .studentFullname(attempt.getStudentFullname())
                 .attemptNo(attempt.getAttemptNo())
                 .startedAt(attempt.getStartedAt())
                 .submittedAt(attempt.getSubmittedAt())
@@ -390,6 +405,8 @@ public class ExamAttemptService {
                 .attemptUuid(attempt.getAttemptUuid())
                 .examUuid(attempt.getExamUuid())
                 .examName(exam != null ? exam.getExamName() : null)
+                .studentId(attempt.getStudentId())
+                .studentFullname(attempt.getStudentFullname())
                 .attemptNo(attempt.getAttemptNo())
                 .startedAt(attempt.getStartedAt())
                 .submittedAt(attempt.getSubmittedAt())
@@ -748,6 +765,31 @@ public class ExamAttemptService {
                 .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
+    private StudentIdentity resolveCurrentStudentIdentity() {
+        UUID studentUuid = resolveCurrentStudentUuid();
+        String roleName = SecurityUtil.getCurrentRoleName()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .orElseThrow(() -> new IdInvalidException("Role name is missing from JWT"));
+        String studentFullname = SecurityUtil.getCurrentUserFullName()
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new IdInvalidException("User full name is missing from JWT"));
+
+        if ("STUDENT".equals(roleName)) {
+            String studentId = SecurityUtil.getCurrentStudentId()
+                    .filter(StringUtils::hasText)
+                    .orElseThrow(() -> new IdInvalidException("Student id is missing from JWT"));
+            return new StudentIdentity(studentUuid, studentId, studentFullname);
+        }
+
+        if (NON_STUDENT_ATTEMPT_ROLES.contains(roleName)) {
+            return new StudentIdentity(studentUuid, null, "NOT_STUDENT_" + studentFullname);
+        }
+
+        throw new IdInvalidException("Current role is not allowed to start an exam attempt");
+    }
+
     private record AttemptQuestionSnapshot(
             Integer questionOrder,
             UUID questionUuid,
@@ -756,5 +798,8 @@ public class ExamAttemptService {
             Boolean fromQuestionGroup,
             UUID groupUuid,
             String groupName) {
+    }
+
+    private record StudentIdentity(UUID studentUuid, String studentId, String studentFullname) {
     }
 }

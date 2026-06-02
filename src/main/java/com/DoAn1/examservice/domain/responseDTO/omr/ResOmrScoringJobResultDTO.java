@@ -18,6 +18,7 @@ public class ResOmrScoringJobResultDTO {
     private String paperCode;
     private String studentCode;
     private String schoolYear;
+    private String studentFullname;
     private UUID studentUuid;
     private UUID attemptUuid;
     private OmrScoringJobResultStatus status;

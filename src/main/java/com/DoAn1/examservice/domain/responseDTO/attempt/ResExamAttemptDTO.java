@@ -19,6 +19,8 @@ public class ResExamAttemptDTO {
     private UUID examUuid;
     private String examName;
     private UUID studentUuid;
+    private String studentId;
+    private String studentFullname;
     private Integer attemptNo;
     private Instant startedAt;
     private Instant submittedAt;

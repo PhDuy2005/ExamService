@@ -106,6 +106,7 @@ Request body:
   - `id`
   - `email`
   - `fullName`
+  - `studentId`
 - `role`
   - `roleId`
   - `roleName`
@@ -128,6 +129,10 @@ Ví dụ phần `grades` trong token:
 ]
 ```
 
+Ý nghĩa field `user.studentId`:
+- nếu user có role `STUDENT`, backend sẽ cố gắng nhét thêm `studentId` vào claim `user`
+- nếu user không phải `STUDENT`, hoặc không resolve được bản ghi `Student`, `studentId` sẽ là `null`
+
 Ý nghĩa nghiệp vụ:
 - claim này chủ yếu có ích cho học sinh
 - `expiredDate` là `estimate_expire_date` muộn nhất của các `Period` thuộc grade đó
@@ -145,6 +150,10 @@ Frontend web cần:
 #### Mô tả luồng
 
 Đăng nhập -> validate request body -> tạo `UsernamePasswordAuthenticationToken` từ `email + password` -> Spring Security authenticate -> lấy `User` từ DB theo email -> dựng response gồm `user`, `role` -> tạo `access token` có kèm `grades` nếu có -> tạo `refresh token` -> lưu `refresh token` mới vào DB của user -> set cookie `refresh_token` -> trả kết quả
+
+Ghi chú thêm:
+- `access token` hiện có thể mang thêm `user.studentId` cho `STUDENT`
+- `refresh token` không dùng claim `studentId`
 
 #### Exception có thể trả về
 
@@ -274,6 +283,7 @@ Token mới được tạo lại theo đúng logic của login, nên vẫn có:
 - `user`
 - `role`
 - `grades`
+- `user.studentId` nếu user có role `STUDENT`
 
 #### Cookie trả về
 
@@ -385,15 +395,17 @@ Nhận `access token` hiện tại -> lấy email người dùng từ security c
 - `grades` hiện có trong:
   - claim của `access_token`
   - response `account`
+- `studentId` hiện có trong:
+  - claim `user` của `access_token` nếu role là `STUDENT`
 - Password của học sinh được tạo mặc định từ số điện thoại khi học sinh được tạo bởi luồng đăng ký / quản lý học sinh
 - `refresh token` được lưu ở DB theo user, nên mỗi lần login hoặc refresh sẽ thay thế token cũ
 - Frontend không nên tự suy diễn quyền chỉ từ UI; quyền thực tế vẫn phụ thuộc backend
 
 ## 7. Danh sách endpoint tóm tắt
 
-| Method | Path | Mục đích |
-|------|------|------|
-| POST | `/api/v1/auth/login` | Đăng nhập |
-| GET | `/api/v1/auth/account` | Lấy thông tin tài khoản hiện tại |
-| GET | `/api/v1/auth/refresh` | Cấp lại access token |
-| POST | `/api/v1/auth/logout` | Đăng xuất |
+| Method | Path                   | Mục đích                         |
+| ------ | ---------------------- | -------------------------------- |
+| POST   | `/api/v1/auth/login`   | Đăng nhập                        |
+| GET    | `/api/v1/auth/account` | Lấy thông tin tài khoản hiện tại |
+| GET    | `/api/v1/auth/refresh` | Cấp lại access token             |
+| POST   | `/api/v1/auth/logout`  | Đăng xuất                        |

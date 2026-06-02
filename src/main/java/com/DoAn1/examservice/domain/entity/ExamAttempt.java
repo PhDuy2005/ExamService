@@ -42,6 +42,12 @@ public class ExamAttempt {
     @Column(nullable = false)
     private UUID studentUuid;
 
+    @Column(length = 20)
+    private String studentId;
+
+    @Column(length = 255)
+    private String studentFullname;
+
     @Column(nullable = false)
     private Integer attemptNo;
 
