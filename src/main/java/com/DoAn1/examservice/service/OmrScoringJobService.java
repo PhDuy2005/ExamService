@@ -54,7 +54,7 @@ public class OmrScoringJobService {
             throw new StorageException("Exam id is required");
         }
         log.debug("Resolving exam entity for OMR scoring job: examUuid={}", examUuid);
-        Exam exam = examRepository.findById(examUuid)
+        Exam exam = examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
         if (!StringUtils.hasText(exam.getSchoolYear())) {
             log.warn("Create OMR scoring job rejected because schoolYear is missing: examUuid={}", examUuid);

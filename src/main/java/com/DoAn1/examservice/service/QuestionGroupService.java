@@ -109,7 +109,7 @@ public class QuestionGroupService {
     }
 
     private QuestionGroup findQuestionGroupById(UUID questionGroupUuid) {
-        return questionGroupRepository.findById(questionGroupUuid)
+        return questionGroupRepository.findByQuestionGroupUuid(questionGroupUuid)
                 .orElseThrow(() -> new IdInvalidException("Question group not found with id: " + questionGroupUuid));
     }
 

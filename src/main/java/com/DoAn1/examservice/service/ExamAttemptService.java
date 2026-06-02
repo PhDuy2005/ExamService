@@ -263,12 +263,12 @@ public class ExamAttemptService {
     }
 
     private Exam findExamById(UUID examUuid) {
-        return examRepository.findById(examUuid)
+        return examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
     }
 
     private ExamAttempt findAttemptById(UUID attemptUuid) {
-        return examAttemptRepository.findById(attemptUuid)
+        return examAttemptRepository.findByAttemptUuid(attemptUuid)
                 .orElseThrow(() -> new IdInvalidException("Attempt not found with id: " + attemptUuid));
     }
 

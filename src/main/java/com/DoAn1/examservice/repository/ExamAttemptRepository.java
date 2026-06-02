@@ -12,6 +12,8 @@ import com.DoAn1.examservice.domain.entity.ExamAttempt;
 import com.DoAn1.examservice.domain.enums.AttemptStatus;
 
 public interface ExamAttemptRepository extends JpaRepository<ExamAttempt, UUID> {
+    Optional<ExamAttempt> findByAttemptUuid(UUID attemptUuid);
+
     List<ExamAttempt> findByExamUuid(UUID examUuid);
 
     List<ExamAttempt> findByExamUuidAndStudentUuidOrderByAttemptNoAsc(UUID examUuid, UUID studentUuid);

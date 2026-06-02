@@ -119,7 +119,7 @@ public class QuestionService {
     }
 
     private Question findQuestionById(UUID questionUuid) {
-        return questionRepository.findById(questionUuid)
+        return questionRepository.findByQuestionUuid(questionUuid)
                 .orElseThrow(() -> new IdInvalidException("Question not found with id: " + questionUuid));
     }
 
