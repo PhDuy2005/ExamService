@@ -56,6 +56,7 @@ import com.DoAn1.examservice.repository.QuestionRepository;
 import com.DoAn1.examservice.repository.QuestionTrueFalseStatementRepository;
 import com.DoAn1.examservice.repository.StudentAnswerRepository;
 import com.DoAn1.examservice.util.SecurityUtil;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -799,6 +800,7 @@ public class ExamAttemptService {
         throw new IdInvalidException("Current role is not allowed to start an exam attempt");
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record AttemptQuestionSnapshot(
             Integer questionOrder,
             UUID questionUuid,
