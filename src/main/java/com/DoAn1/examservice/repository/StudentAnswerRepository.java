@@ -11,6 +11,8 @@ import com.DoAn1.examservice.domain.entity.StudentAnswer;
 public interface StudentAnswerRepository extends JpaRepository<StudentAnswer, UUID> {
     List<StudentAnswer> findByAttemptUuidAndQuestionUuidOrderByQuestionAttemptNumberAsc(UUID attemptUuid, UUID questionUuid);
 
+    List<StudentAnswer> findByAttemptUuidIn(List<UUID> attemptUuids);
+
     Optional<StudentAnswer> findByAttemptUuidAndQuestionUuidAndIsFinalAnswerTrue(UUID attemptUuid, UUID questionUuid);
 
     List<StudentAnswer> findByAttemptUuidOrderByQuestionUuidAscQuestionAttemptNumberAsc(UUID attemptUuid);

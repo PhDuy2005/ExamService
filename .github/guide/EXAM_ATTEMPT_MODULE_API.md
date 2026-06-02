@@ -95,6 +95,7 @@ Ví dụ:
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": "string | null",
   "scoredImageUrl": "string | null",
   "questions": []
@@ -136,6 +137,7 @@ Ví dụ:
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": "string | null",
   "scoredImageUrl": "string | null"
 }
@@ -275,6 +277,7 @@ Người dùng được phép bắt đầu làm bài -> lấy `studentUuid`, `st
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": [
@@ -361,6 +364,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": [
@@ -443,6 +447,7 @@ Ví dụ item summary:
   "status": "IN_PROGRESS",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": null,
   "scoredImageUrl": null
 }
@@ -542,7 +547,7 @@ Trả `ResExamAttemptDTO` giống API lấy chi tiết attempt.
 
 ### Mô tả luồng
 
-Nhận `attemptUuid` -> kiểm tra quyền sở hữu -> kiểm tra attempt còn `IN_PROGRESS` không -> lấy toàn bộ snapshot câu hỏi -> lấy answer history của từng câu -> tạo `final answer` cho từng câu -> lấy `QuestionAnswerKey` -> chấm điểm theo từng loại câu hỏi -> cập nhật `submittedAt`, `timeSpentSeconds`, `status`, `score`, `isAutoSubmitted` -> trả kết quả
+Nhận `attemptUuid` -> kiểm tra quyền sở hữu -> kiểm tra attempt còn `IN_PROGRESS` không -> lấy toàn bộ snapshot câu hỏi -> lấy answer history của từng câu -> tạo `final answer` cho từng câu -> lấy `QuestionAnswerKey` -> chấm điểm theo từng loại câu hỏi -> đếm số sự kiện giám sát của attempt -> cập nhật `submittedAt`, `timeSpentSeconds`, `status`, `score`, `isAutoSubmitted`, `violationCount` -> trả kết quả
 
 ### Input format
 
@@ -571,6 +576,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "SCORED",
     "score": 8.5,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": []
@@ -877,7 +883,7 @@ Frontend có thể đọc lại:
 
 - lấy toàn bộ attempt của học sinh
 - filter theo `examUuid`
-- kiểm tra `status`, `score`, `submittedAt`, `isAutoSubmitted`
+- kiểm tra `status`, `score`, `submittedAt`, `isAutoSubmitted`, `violationCount`
 
 ### 8.6. Ghi nhận giám sát/gian lận
 

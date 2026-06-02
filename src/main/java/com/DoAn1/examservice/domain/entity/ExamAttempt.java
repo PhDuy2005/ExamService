@@ -67,6 +67,8 @@ public class ExamAttempt {
     @Column(nullable = false)
     private Boolean isAutoSubmitted = false;
 
+    private Integer violationCount = 0;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private SubmitSource submitSource;

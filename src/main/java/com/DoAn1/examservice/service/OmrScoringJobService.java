@@ -7,6 +7,7 @@ import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,6 +25,7 @@ import com.DoAn1.examservice.exception.StorageException;
 import com.DoAn1.examservice.repository.ExamRepository;
 import com.DoAn1.examservice.repository.OmrScoringJobResultRepository;
 import com.DoAn1.examservice.repository.OmrScoringJobRepository;
+import com.DoAn1.examservice.service.event.OmrScoringJobCreatedEvent;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -40,7 +42,7 @@ public class OmrScoringJobService {
     private final OmrScoringJobRepository omrScoringJobRepository;
     private final OmrScoringJobResultRepository omrScoringJobResultRepository;
     private final FileService fileService;
-    private final OmrScoringJobWorker omrScoringJobWorker;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public ResOmrScoringJobDTO createScoringJob(
@@ -54,7 +56,7 @@ public class OmrScoringJobService {
             throw new StorageException("Exam id is required");
         }
         log.debug("Resolving exam entity for OMR scoring job: examUuid={}", examUuid);
-        Exam exam = examRepository.findById(examUuid)
+        Exam exam = examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
         if (!StringUtils.hasText(exam.getSchoolYear())) {
             log.warn("Create OMR scoring job rejected because schoolYear is missing: examUuid={}", examUuid);
@@ -73,7 +75,7 @@ public class OmrScoringJobService {
         job.setRawImageUrl(rawImageUrl);
 
         OmrScoringJob savedJob = omrScoringJobRepository.save(job);
-        omrScoringJobWorker.processJob(savedJob.getJobUuid());
+        applicationEventPublisher.publishEvent(new OmrScoringJobCreatedEvent(savedJob.getJobUuid()));
         log.info("OMR scoring job created successfully: jobUuid={}, examUuid={}, pageCount={}, status={}",
                 savedJob.getJobUuid(), savedJob.getExamUuid(), savedJob.getPageCount(), savedJob.getStatus());
         return buildResponse(savedJob);

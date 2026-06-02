@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionalEventListener;
+import org.springframework.transaction.event.TransactionPhase;
 
 import com.DoAn1.examservice.domain.entity.OmrScoringJob;
 import com.DoAn1.examservice.domain.entity.OmrScoringJobResult;
@@ -18,6 +20,7 @@ import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrSectionsDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResOmrImportDTO;
 import com.DoAn1.examservice.repository.OmrScoringJobRepository;
 import com.DoAn1.examservice.repository.OmrScoringJobResultRepository;
+import com.DoAn1.examservice.service.event.OmrScoringJobCreatedEvent;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
@@ -57,7 +60,9 @@ public class OmrScoringJobWorker {
     }
 
     @Async
-    public void processJob(UUID jobUuid) {
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void processJob(OmrScoringJobCreatedEvent event) {
+        UUID jobUuid = event.jobUuid();
         log.info("Processing OMR scoring job: jobUuid={}", jobUuid);
         OmrScoringJob job = omrScoringJobRepository.findByJobUuid(jobUuid)
                 .orElseThrow(() -> new IllegalArgumentException("OMR scoring job not found with id: " + jobUuid));

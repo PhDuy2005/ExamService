@@ -29,7 +29,8 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
         if (path.startsWith("/v3/api-docs") || path.startsWith("/swagger-ui")) {
             return body;
         }
-        if (body instanceof RestResponse<?> || body instanceof String || body instanceof Resource) {
+        if (body instanceof RestResponse<?> || body instanceof String || body instanceof Resource || body instanceof byte[]
+                || selectedContentType.includes(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))) {
             return body;
         }
 

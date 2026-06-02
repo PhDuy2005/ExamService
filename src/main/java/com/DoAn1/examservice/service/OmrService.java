@@ -118,7 +118,7 @@ public class OmrService {
     }
 
     private Exam findExamById(UUID examUuid) {
-        return examRepository.findById(examUuid)
+        return examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
     }
 

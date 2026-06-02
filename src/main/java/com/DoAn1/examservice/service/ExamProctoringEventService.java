@@ -33,7 +33,7 @@ public class ExamProctoringEventService {
 
     @Transactional(readOnly = true)
     public List<ResProctoringEventDTO> getEvents(UUID attemptUuid) {
-        ExamAttempt attempt = examAttemptRepository.findById(attemptUuid)
+        ExamAttempt attempt = examAttemptRepository.findByAttemptUuid(attemptUuid)
                 .orElseThrow(() -> new IdInvalidException("Attempt not found with id: " + attemptUuid));
         validateAttemptOwnership(attempt);
 
@@ -44,7 +44,7 @@ public class ExamProctoringEventService {
 
     @Transactional
     public ResProctoringEventBatchDTO createEvents(UUID attemptUuid, ReqProctoringEventBatchDTO request) {
-        ExamAttempt attempt = examAttemptRepository.findById(attemptUuid)
+        ExamAttempt attempt = examAttemptRepository.findByAttemptUuid(attemptUuid)
                 .orElseThrow(() -> new IdInvalidException("Attempt not found with id: " + attemptUuid));
         validateAttemptOwnership(attempt);
 
