@@ -37,6 +37,8 @@ dependencies {
     implementation("io.grpc:grpc-stub:$grpcVersion")
     implementation("com.google.protobuf:protobuf-java:$protobufVersion")
     implementation("org.apache.poi:poi-ooxml:5.2.5")
+    implementation("org.apache.pdfbox:pdfbox:3.0.5")
+    implementation("org.scilab.forge:jlatexmath:1.0.7")
 
     compileOnly("org.projectlombok:lombok")
     compileOnly("javax.annotation:javax.annotation-api:1.3.2")

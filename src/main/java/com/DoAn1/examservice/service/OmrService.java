@@ -1,6 +1,7 @@
 package com.DoAn1.examservice.service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -40,6 +41,7 @@ import com.DoAn1.examservice.repository.ExamRepository;
 import com.DoAn1.examservice.repository.OmrImportRepository;
 import com.DoAn1.examservice.repository.QuestionRepository;
 import com.DoAn1.examservice.util.SecurityUtil;
+import com.DoAn1.examservice.util.UuidV7Generator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -58,6 +60,7 @@ public class OmrService {
     private final OmrImportRepository omrImportRepository;
     private final QuestionRepository questionRepository;
     private final ExamAttemptService examAttemptService;
+    private final ExamPaperPdfService examPaperPdfService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -74,10 +77,13 @@ public class OmrService {
         }
 
         ExamPaper examPaper = new ExamPaper();
+        examPaper.setPaperUuid(UuidV7Generator.generate());
         examPaper.setExamUuid(exam.getExamUuid());
         examPaper.setPaperCode(paperCode);
         examPaper.setQuestionSnapshotJson(serializeSnapshots(snapshots));
         examPaper.setGeneratedByUserUuid(resolveCurrentUserUuid());
+        examPaper.setGeneratedAt(Instant.now());
+        examPaper.setPdfUrl(examPaperPdfService.generateAndStore(exam, examPaper));
 
         return buildPaperResponse(examPaperRepository.save(examPaper), snapshots);
     }
@@ -233,6 +239,7 @@ public class OmrService {
                 .paperCode(paper.getPaperCode())
                 .generatedAt(paper.getGeneratedAt())
                 .generatedByUserUuid(paper.getGeneratedByUserUuid())
+                .pdfUrl(paper.getPdfUrl())
                 .questions(snapshots.stream()
                         .sorted(Comparator.comparing(PaperQuestionSnapshot::questionOrder))
                         .map(snapshot -> ResExamPaperQuestionDTO.builder()

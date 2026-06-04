@@ -31,7 +31,9 @@ Module `OMR` phục vụ luồng chấm bài giấy:
 
 ### Mô tả luồng
 
-Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra mã đề chưa bị trùng trong cùng đề -> random câu hỏi từ các group theo `pickQuestionCount` -> tạo snapshot câu hỏi cố định cho bản in -> lưu `ExamPaper` -> trả danh sách câu hỏi theo thứ tự in.
+Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra mã đề chưa bị trùng trong cùng đề -> random câu hỏi từ các group theo `pickQuestionCount` -> tạo snapshot câu hỏi cố định cho bản in -> sinh file PDF đề thi -> lưu PDF vào storage -> lưu `ExamPaper` cùng `pdfUrl` -> trả danh sách câu hỏi theo `questionOrder` nội bộ.
+
+PDF chứa thông tin đề, nội dung câu hỏi, lựa chọn `MCQ`, mệnh đề `TFQ`, vùng trả lời `SAQ` và ảnh câu hỏi nếu `imagePath` là URL nội bộ `/storage/...`. Bản in được gom theo thứ tự phần `MCQ -> TFQ -> SAQ`, dùng `sectionQuestionNumber` làm số câu hiển thị và không chứa đáp án đúng. Xem chi tiết tại [PDF Module API](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/PDF_MODULE_API.md).
 
 ### Input format
 
@@ -54,6 +56,7 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
     "paperCode": "M001",
     "generatedAt": "2026-05-25T10:00:00Z",
     "generatedByUserUuid": "uuid",
+    "pdfUrl": "/storage/exam-papers/exam-uuid/M001.pdf",
     "questions": [
       {
         "questionOrder": 1,
@@ -80,6 +83,9 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
 - `Exam paper must contain at least one question`
 - `User id is missing from JWT`
 - `Failed to serialize exam paper question snapshot`
+- `Exam paper font file not found: {fontPath}`
+- `Failed to generate exam paper PDF`
+- `Failed to store exam paper PDF`
 
 ---
 
@@ -112,6 +118,7 @@ Một exam có thể có nhiều `ExamPaper`, vì vậy API trả về một dan
       "paperCode": "M001",
       "generatedAt": "2026-05-25T10:00:00Z",
       "generatedByUserUuid": "uuid",
+      "pdfUrl": "/storage/exam-papers/exam-uuid/M001.pdf",
       "questions": [
         {
           "questionOrder": 1,
@@ -132,10 +139,27 @@ Một exam có thể có nhiều `ExamPaper`, vì vậy API trả về một dan
 
 Nếu exam tồn tại nhưng chưa có mã đề, `data` là danh sách rỗng.
 
+Frontend có thể dùng `pdfUrl` để mở hoặc tải file PDF đề thi.
+
 ### Exception có thể trả về
 
 - `Exam not found with id: {examUuid}`
 - `Failed to read exam paper question snapshot`
+
+---
+
+## 3.2. Cấu hình sinh PDF đề thi
+
+- tài liệu đầy đủ về tạo, tải và render PDF:
+  - [PDF Module API](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/PDF_MODULE_API.md)
+- thư mục lưu file: `/storage/exam-papers/{examUuid}/{paperCode}.pdf`
+- font Unicode được cấu hình bằng:
+  - `EXAMSERVICE_EXAM_PAPER_FONT_PATH`
+  - hoặc property `examservice.exam-paper.font-path`
+- giá trị mặc định trên môi trường Windows hiện tại:
+  - `C:/Windows/Fonts/arial.ttf`
+- khi deploy Linux/container, cần cấu hình đường dẫn tới một file font Unicode `.ttf`, ví dụ DejaVu Sans hoặc Noto Sans
+- nếu ảnh câu hỏi không tồn tại hoặc `imagePath` không phải URL nội bộ `/storage/...`, PDF vẫn được tạo nhưng bỏ qua ảnh đó
 
 ---
 
