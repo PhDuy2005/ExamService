@@ -229,6 +229,8 @@ public class ExamService {
             }
         }
 
+        validateDuplicateQuestions(examQuestions, resolvedGroups, questionById);
+
         return new ValidationContext(questionById, resolvedGroups);
     }
 
@@ -493,6 +495,53 @@ public class ExamService {
 
     private String normalizeTopic(String topic) {
         return StringUtils.hasText(topic) ? topic.trim() : null;
+    }
+
+    private void validateDuplicateQuestions(
+            List<ReqExamQuestionDTO> examQuestions,
+            List<ResolvedExamQuestionGroupPayload> resolvedGroups,
+            Map<UUID, Question> questionById) {
+        Map<UUID, List<String>> occurrencesByQuestionId = new LinkedHashMap<>();
+
+        for (ReqExamQuestionDTO examQuestion : examQuestions) {
+            occurrencesByQuestionId.computeIfAbsent(examQuestion.getQuestionUuid(), ignored -> new ArrayList<>())
+                    .add("cau " + examQuestion.getQuestionOrder() + " - cau hoi le");
+        }
+
+        for (ResolvedExamQuestionGroupPayload group : resolvedGroups) {
+            List<QuestionGroupItem> items = group.items();
+            for (int index = 0; index < items.size(); index++) {
+                QuestionGroupItem item = items.get(index);
+                occurrencesByQuestionId.computeIfAbsent(item.getQuestionUuid(), ignored -> new ArrayList<>())
+                        .add("cau " + (index + 1) + " - Nhom " + group.questionGroup().getGroupName());
+            }
+        }
+
+        UUID duplicateQuestionId = occurrencesByQuestionId.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+        if (duplicateQuestionId == null) {
+            return;
+        }
+
+        Question question = questionById.get(duplicateQuestionId);
+        String questionLabel = buildDuplicateQuestionLabel(question, duplicateQuestionId);
+        String occurrences = String.join(", ", occurrencesByQuestionId.get(duplicateQuestionId));
+        throw new IdInvalidException("Cau hoi " + questionLabel
+                + " chi duoc xuat hien 1 lan trong de. Hien tai dang xuat hien tai: " + occurrences);
+    }
+
+    private String buildDuplicateQuestionLabel(Question question, UUID questionUuid) {
+        if (question == null || !StringUtils.hasText(question.getQuestionContent())) {
+            return questionUuid.toString();
+        }
+
+        String normalizedContent = question.getQuestionContent().trim().replaceAll("\\s+", " ");
+        return normalizedContent.length() > 80
+                ? normalizedContent.substring(0, 77) + "..."
+                : normalizedContent;
     }
 
     private record ValidationContext(
