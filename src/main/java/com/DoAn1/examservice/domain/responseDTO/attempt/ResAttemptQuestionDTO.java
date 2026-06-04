@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.UUID;
 
 import com.DoAn1.examservice.domain.enums.QuestionType;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.Builder;
 import lombok.Getter;
@@ -29,4 +30,10 @@ public class ResAttemptQuestionDTO {
     private String currentRawAnswer;
     private String currentNormalizedAnswer;
     private Integer answerChangeCount;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String correctAnswerRaw;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String correctNormalizedAnswer;
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private BigDecimal earnedScore;
 }

@@ -115,12 +115,14 @@ public class ExamAttemptService {
         return buildAttemptResponse(savedAttempt, exam);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ResExamAttemptDTO getAttempt(UUID attemptUuid) {
         ExamAttempt attempt = findAttemptById(attemptUuid);
         validateAttemptOwnership(attempt);
         Exam exam = findExamById(attempt.getExamUuid());
-        attempt = autoSubmitIfExpired(attempt, exam);
+        Instant now = Instant.now();
+        attempt = autoSubmitIfExpired(attempt, exam, now);
+        attempt = releaseAnswersIfExamEnded(attempt, exam, now);
         return buildAttemptResponse(attempt, exam);
     }
 
@@ -307,13 +309,32 @@ public class ExamAttemptService {
     }
 
     private ExamAttempt autoSubmitIfExpired(ExamAttempt attempt, Exam exam) {
+        return autoSubmitIfExpired(attempt, exam, Instant.now());
+    }
+
+    private ExamAttempt autoSubmitIfExpired(ExamAttempt attempt, Exam exam, Instant now) {
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
             return attempt;
         }
-        if (!isAttemptExpired(attempt, exam, Instant.now())) {
+        if (!isAttemptExpired(attempt, exam, now)) {
             return attempt;
         }
         return finalizeAttempt(attempt, exam, true);
+    }
+
+    private ExamAttempt releaseAnswersIfExamEnded(ExamAttempt attempt, Exam exam, Instant now) {
+        if (attempt.getStatus() == AttemptStatus.ANSWER_RELEASED) {
+            return attempt;
+        }
+        if (exam.getEndTime() == null || !exam.getEndTime().isBefore(now)) {
+            return attempt;
+        }
+        if (attempt.getStatus() != AttemptStatus.SUBMITTED && attempt.getStatus() != AttemptStatus.SCORED) {
+            return attempt;
+        }
+
+        attempt.setStatus(AttemptStatus.ANSWER_RELEASED);
+        return examAttemptRepository.save(attempt);
     }
 
     private List<AttemptQuestionSnapshot> buildAttemptQuestionSnapshots(UUID examUuid) {
@@ -377,10 +398,17 @@ public class ExamAttemptService {
                 .stream()
                 .collect(Collectors.groupingBy(StudentAnswer::getQuestionUuid, LinkedHashMap::new, Collectors.toList()));
 
+        boolean answersReleased = attempt.getStatus() == AttemptStatus.ANSWER_RELEASED;
+        Map<UUID, QuestionAnswerKey> answerKeyByQuestion = answersReleased
+                ? questionAnswerKeyRepository.findByQuestionUuidIn(new ArrayList<>(questionIds))
+                        .stream()
+                        .collect(Collectors.toMap(QuestionAnswerKey::getQuestionUuid, Function.identity()))
+                : Map.of();
+
         List<ResAttemptQuestionDTO> questions = snapshots.stream()
                 .sorted(Comparator.comparing(AttemptQuestionSnapshot::questionOrder))
                 .map(snapshot -> buildAttemptQuestionResponse(snapshot, questionById, optionsByQuestion, statementsByQuestion,
-                        answerHistoryByQuestion))
+                        answerHistoryByQuestion, answerKeyByQuestion, exam, attempt.getSubmitSource(), answersReleased))
                 .toList();
 
         return ResExamAttemptDTO.builder()
@@ -395,7 +423,7 @@ public class ExamAttemptService {
                 .submittedAt(attempt.getSubmittedAt())
                 .timeSpentSeconds(attempt.getTimeSpentSeconds())
                 .status(attempt.getStatus())
-                .score(attempt.getScore())
+                .score(isAttemptScoreVisible(attempt.getStatus()) ? attempt.getScore() : null)
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
                 .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
@@ -416,7 +444,7 @@ public class ExamAttemptService {
                 .submittedAt(attempt.getSubmittedAt())
                 .timeSpentSeconds(attempt.getTimeSpentSeconds())
                 .status(attempt.getStatus())
-                .score(attempt.getScore())
+                .score(isAttemptScoreVisible(attempt.getStatus()) ? attempt.getScore() : null)
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
                 .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
@@ -429,10 +457,15 @@ public class ExamAttemptService {
             Map<UUID, Question> questionById,
             Map<UUID, List<QuestionMcOption>> optionsByQuestion,
             Map<UUID, List<QuestionTrueFalseStatement>> statementsByQuestion,
-            Map<UUID, List<StudentAnswer>> answerHistoryByQuestion) {
+            Map<UUID, List<StudentAnswer>> answerHistoryByQuestion,
+            Map<UUID, QuestionAnswerKey> answerKeyByQuestion,
+            Exam exam,
+            SubmitSource submitSource,
+            boolean answersReleased) {
         Question question = questionById.get(snapshot.questionUuid());
         List<StudentAnswer> history = answerHistoryByQuestion.getOrDefault(snapshot.questionUuid(), List.of());
         StudentAnswer latestAnswer = history.isEmpty() ? null : history.get(history.size() - 1);
+        QuestionAnswerKey answerKey = answerKeyByQuestion.get(snapshot.questionUuid());
 
         return ResAttemptQuestionDTO.builder()
                 .questionOrder(snapshot.questionOrder())
@@ -462,7 +495,16 @@ public class ExamAttemptService {
                 .currentRawAnswer(latestAnswer != null ? latestAnswer.getRawAnswer() : null)
                 .currentNormalizedAnswer(latestAnswer != null ? latestAnswer.getNormalizedAnswer() : null)
                 .answerChangeCount(history.size())
+                .correctAnswerRaw(answersReleased && answerKey != null ? answerKey.getCorrectAnswerRaw() : null)
+                .correctNormalizedAnswer(answersReleased && answerKey != null ? answerKey.getNormalizedAnswer() : null)
+                .earnedScore(answersReleased
+                        ? calculateQuestionScore(exam, submitSource, snapshot, latestAnswer, answerKey)
+                        : null)
                 .build();
+    }
+
+    private boolean isAttemptScoreVisible(AttemptStatus status) {
+        return status == AttemptStatus.SCORED || status == AttemptStatus.ANSWER_RELEASED;
     }
 
     private ExamAttempt finalizeAttempt(ExamAttempt attempt, Exam exam, boolean autoSubmitted) {

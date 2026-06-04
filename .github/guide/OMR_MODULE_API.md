@@ -60,6 +60,7 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
         "sectionQuestionNumber": 1,
         "questionUuid": "uuid",
         "questionType": "MCQ",
+        "imagePath": "/storage/questions/example.png",
         "score": 0.25,
         "fromQuestionGroup": true,
         "groupUuid": "uuid",
@@ -79,6 +80,62 @@ Nhận `examUuid` và `paperCode` -> kiểm tra đề tồn tại -> kiểm tra 
 - `Exam paper must contain at least one question`
 - `User id is missing from JWT`
 - `Failed to serialize exam paper question snapshot`
+
+---
+
+## 3.1. API lấy danh sách exam paper theo exam
+
+### Đường dẫn
+
+`GET /api/v1/omr/exams/{examUuid}/exam-papers`
+
+### Mô tả luồng
+
+Nhận `examUuid` -> kiểm tra đề tồn tại -> lấy toàn bộ `ExamPaper` của đề và sắp xếp tăng dần theo `paperCode` -> đọc snapshot câu hỏi của từng mã đề -> trả danh sách mã đề cùng câu hỏi.
+
+Một exam có thể có nhiều `ExamPaper`, vì vậy API trả về một danh sách.
+
+### Input format
+
+- `examUuid`: `UUID`
+
+### Output format
+
+```json
+{
+  "statusCode": 200,
+  "message": "Get OMR exam papers by exam id",
+  "data": [
+    {
+      "paperUuid": "uuid",
+      "examUuid": "uuid",
+      "paperCode": "M001",
+      "generatedAt": "2026-05-25T10:00:00Z",
+      "generatedByUserUuid": "uuid",
+      "questions": [
+        {
+          "questionOrder": 1,
+          "sectionQuestionNumber": 1,
+          "questionUuid": "uuid",
+          "questionType": "MCQ",
+          "imagePath": "/storage/questions/example.png",
+          "score": 0.25,
+          "fromQuestionGroup": true,
+          "groupUuid": "uuid",
+          "groupName": "Tích phân"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Nếu exam tồn tại nhưng chưa có mã đề, `data` là danh sách rỗng.
+
+### Exception có thể trả về
+
+- `Exam not found with id: {examUuid}`
+- `Failed to read exam paper question snapshot`
 
 ---
 

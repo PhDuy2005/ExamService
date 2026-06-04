@@ -67,6 +67,7 @@ Theo yêu cầu hiện tại:
   - học sinh bắt đầu làm bài
   - lưu đáp án trong quá trình làm
   - xem chi tiết attempt
+  - xem lại bài, tổng điểm, đáp án đúng và điểm từng câu theo trạng thái công bố
   - nộp bài
   - xem danh sách các lần làm bài
 - File guide chi tiết:
