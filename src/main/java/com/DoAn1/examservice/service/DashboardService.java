@@ -315,6 +315,9 @@ public class DashboardService {
                                 data.questionById().get(snapshot.questionUuid()),
                                 data.optionsByQuestion().getOrDefault(snapshot.questionUuid(), List.of()),
                                 data.statementsByQuestion().getOrDefault(snapshot.questionUuid(), List.of())))
+                        .imagePath(data.questionById().get(snapshot.questionUuid()) != null
+                                ? data.questionById().get(snapshot.questionUuid()).getImagePath()
+                                : null)
                         .correctAnswer(correctAnswer(data.answerKeyByQuestion().get(snapshot.questionUuid())))
                         .answerCounts(answerCountsByQuestion.getOrDefault(snapshot.questionUuid(), Map.of()))
                         .build())

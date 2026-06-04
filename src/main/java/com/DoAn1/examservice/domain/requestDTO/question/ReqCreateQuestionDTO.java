@@ -6,6 +6,7 @@ import com.DoAn1.examservice.domain.enums.QuestionType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -18,6 +19,9 @@ public class ReqCreateQuestionDTO {
 
     @NotBlank(message = "Question content must not be blank")
     private String questionContent;
+
+    @Size(max = 1000, message = "Image path must not exceed 1000 characters")
+    private String imagePath;
 
     private String questionTopic;
 

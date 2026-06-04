@@ -17,6 +17,7 @@ public class ResQuestionStatDTO {
     private UUID questionUuid;
     private QuestionType questionType;
     private String questionContent;
+    private String imagePath;
     private String correctAnswer;
     private Map<String, Long> answerCounts;
 }

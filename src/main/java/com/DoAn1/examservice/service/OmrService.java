@@ -21,6 +21,7 @@ import com.DoAn1.examservice.domain.entity.ExamQuestion;
 import com.DoAn1.examservice.domain.entity.ExamQuestionGroup;
 import com.DoAn1.examservice.domain.entity.ExamQuestionGroupItem;
 import com.DoAn1.examservice.domain.entity.OmrImport;
+import com.DoAn1.examservice.domain.entity.Question;
 import com.DoAn1.examservice.domain.enums.QuestionType;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqCreateExamPaperDTO;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrAnswerDTO;
@@ -37,6 +38,7 @@ import com.DoAn1.examservice.repository.ExamQuestionGroupRepository;
 import com.DoAn1.examservice.repository.ExamQuestionRepository;
 import com.DoAn1.examservice.repository.ExamRepository;
 import com.DoAn1.examservice.repository.OmrImportRepository;
+import com.DoAn1.examservice.repository.QuestionRepository;
 import com.DoAn1.examservice.util.SecurityUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -54,6 +56,7 @@ public class OmrService {
     private final ExamQuestionGroupItemRepository examQuestionGroupItemRepository;
     private final ExamPaperRepository examPaperRepository;
     private final OmrImportRepository omrImportRepository;
+    private final QuestionRepository questionRepository;
     private final ExamAttemptService examAttemptService;
     private final ObjectMapper objectMapper;
 
@@ -210,6 +213,11 @@ public class OmrService {
     }
 
     private ResExamPaperDTO buildPaperResponse(ExamPaper paper, List<PaperQuestionSnapshot> snapshots) {
+        Map<UUID, Question> questionById = questionRepository.findAllById(
+                snapshots.stream().map(PaperQuestionSnapshot::questionUuid).collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Question::getQuestionUuid, question -> question));
+
         return ResExamPaperDTO.builder()
                 .paperUuid(paper.getPaperUuid())
                 .examUuid(paper.getExamUuid())
@@ -223,6 +231,9 @@ public class OmrService {
                                 .sectionQuestionNumber(snapshot.sectionQuestionNumber())
                                 .questionUuid(snapshot.questionUuid())
                                 .questionType(snapshot.questionType())
+                                .imagePath(questionById.get(snapshot.questionUuid()) != null
+                                        ? questionById.get(snapshot.questionUuid()).getImagePath()
+                                        : null)
                                 .score(snapshot.score())
                                 .fromQuestionGroup(snapshot.fromQuestionGroup())
                                 .groupUuid(snapshot.groupUuid())

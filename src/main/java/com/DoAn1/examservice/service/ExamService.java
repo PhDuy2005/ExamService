@@ -463,6 +463,7 @@ public class ExamService {
         return ResExamQuestionDetailDTO.builder()
                 .questionUuid(question.getQuestionUuid())
                 .questionContent(question.getQuestionContent())
+                .imagePath(question.getImagePath())
                 .questionTopic(question.getQuestionTopic())
                 .questionType(question.getQuestionType())
                 .build();

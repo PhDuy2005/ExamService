@@ -439,6 +439,7 @@ public class ExamAttemptService {
                 .questionUuid(snapshot.questionUuid())
                 .questionType(snapshot.questionType())
                 .questionContent(question != null ? question.getQuestionContent() : null)
+                .imagePath(question != null ? question.getImagePath() : null)
                 .questionTopic(question != null ? question.getQuestionTopic() : null)
                 .score(snapshot.score())
                 .fromQuestionGroup(snapshot.fromQuestionGroup())
