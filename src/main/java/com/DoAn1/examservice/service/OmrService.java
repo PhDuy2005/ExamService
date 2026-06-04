@@ -82,6 +82,15 @@ public class OmrService {
         return buildPaperResponse(examPaperRepository.save(examPaper), snapshots);
     }
 
+    @Transactional(readOnly = true)
+    public List<ResExamPaperDTO> getExamPapersByExamUuid(UUID examUuid) {
+        findExamById(examUuid);
+        return examPaperRepository.findByExamUuidOrderByPaperCodeAsc(examUuid)
+                .stream()
+                .map(paper -> buildPaperResponse(paper, deserializeSnapshots(paper.getQuestionSnapshotJson())))
+                .toList();
+    }
+
     @Transactional
     public ResOmrImportDTO importOmrData(ReqOmrImportDTO request) {
         String externalSubmissionId = normalizeExternalSubmissionId(request.getExternalSubmissionId());
