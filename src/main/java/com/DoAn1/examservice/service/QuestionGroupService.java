@@ -19,6 +19,7 @@ import com.DoAn1.examservice.domain.entity.QuestionGroup;
 import com.DoAn1.examservice.domain.entity.QuestionGroupItem;
 import com.DoAn1.examservice.domain.requestDTO.questiongroup.ReqCreateQuestionGroupDTO;
 import com.DoAn1.examservice.domain.requestDTO.questiongroup.ReqQuestionGroupItemDTO;
+import com.DoAn1.examservice.domain.requestDTO.questiongroup.ReqUpdateQuestionGroupItemsDTO;
 import com.DoAn1.examservice.domain.responseDTO.questiongroup.ResQuestionGroupDTO;
 import com.DoAn1.examservice.domain.responseDTO.questiongroup.ResQuestionGroupItemDTO;
 import com.DoAn1.examservice.domain.responseDTO.questiongroup.ResQuestionGroupQuestionDetailDTO;
@@ -57,6 +58,25 @@ public class QuestionGroupService {
     @Transactional(readOnly = true)
     public ResQuestionGroupDTO getQuestionGroup(UUID questionGroupUuid) {
         return buildResponse(findQuestionGroupById(questionGroupUuid));
+    }
+
+    @Transactional
+    public ResQuestionGroupDTO updateQuestionGroupItems(
+            UUID questionGroupUuid,
+            ReqUpdateQuestionGroupItemsDTO request) {
+        QuestionGroup questionGroup = findQuestionGroupById(questionGroupUuid);
+        Map<UUID, Question> questionById = validateQuestionGroupItems(
+                request.getItems(),
+                questionGroup.getQuestionType(),
+                questionGroup.getQuestionTopic());
+
+        questionGroupItemRepository.deleteByQuestionGroupUuid(questionGroupUuid);
+        questionGroupItemRepository.flush();
+        saveQuestionGroupItems(questionGroupUuid, request.getItems());
+
+        questionGroup.setQuestionCount(request.getItems().size());
+        QuestionGroup savedQuestionGroup = questionGroupRepository.save(questionGroup);
+        return buildResponse(savedQuestionGroup, questionById);
     }
 
     @Transactional(readOnly = true)
@@ -115,6 +135,22 @@ public class QuestionGroupService {
 
     private QuestionGroupValidationContext validateQuestionGroupPayload(ReqCreateQuestionGroupDTO request) {
         List<ReqQuestionGroupItemDTO> items = request.getItems();
+        Map<UUID, Question> questionById = validateQuestionGroupItems(
+                items,
+                request.getQuestionType(),
+                request.getQuestionTopic());
+
+        if (request.getQuestionCount().intValue() != items.size()) {
+            throw new IdInvalidException("Question count must match the number of group items");
+        }
+
+        return new QuestionGroupValidationContext(questionById);
+    }
+
+    private Map<UUID, Question> validateQuestionGroupItems(
+            List<ReqQuestionGroupItemDTO> items,
+            com.DoAn1.examservice.domain.enums.QuestionType questionType,
+            String questionTopic) {
         if (items.isEmpty()) {
             throw new IdInvalidException("Question group must contain at least one item");
         }
@@ -126,26 +162,22 @@ public class QuestionGroupService {
             throw new IdInvalidException("Question ids in a question group must be unique");
         }
 
-        if (request.getQuestionCount().intValue() != items.size()) {
-            throw new IdInvalidException("Question count must match the number of group items");
-        }
-
         Map<UUID, Question> questionById = fetchQuestionsByIds(uniqueQuestionIds);
         for (ReqQuestionGroupItemDTO item : items) {
             Question question = questionById.get(item.getQuestionUuid());
-            if (question.getQuestionType() != request.getQuestionType()) {
+            if (question.getQuestionType() != questionType) {
                 throw new IdInvalidException("Question group type must match item question type for question id: "
                         + item.getQuestionUuid());
             }
-            String normalizedTopic = normalizeTopic(request.getQuestionTopic());
-            String questionTopic = normalizeTopic(question.getQuestionTopic());
-            if (normalizedTopic != null && !normalizedTopic.equalsIgnoreCase(questionTopic)) {
+            String normalizedTopic = normalizeTopic(questionTopic);
+            String itemQuestionTopic = normalizeTopic(question.getQuestionTopic());
+            if (normalizedTopic != null && !normalizedTopic.equalsIgnoreCase(itemQuestionTopic)) {
                 throw new IdInvalidException("Question group topic must match item question topic for question id: "
                         + item.getQuestionUuid());
             }
         }
 
-        return new QuestionGroupValidationContext(questionById);
+        return questionById;
     }
 
     private Map<UUID, Question> fetchQuestionsByIds(Set<UUID> questionIds) {

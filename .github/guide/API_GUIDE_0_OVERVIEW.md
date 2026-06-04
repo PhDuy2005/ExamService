@@ -44,6 +44,7 @@ Theo yêu cầu hiện tại:
 
 - Mục đích:
   - tạo nhóm câu hỏi dùng lại được
+  - thêm, xóa hoặc thay đổi câu hỏi trong nhóm
   - xem chi tiết nhóm câu hỏi
   - tìm kiếm danh sách nhóm câu hỏi
 - File guide chi tiết:

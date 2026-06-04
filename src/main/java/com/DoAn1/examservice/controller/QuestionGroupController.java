@@ -8,12 +8,14 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.DoAn1.examservice.domain.requestDTO.questiongroup.ReqCreateQuestionGroupDTO;
+import com.DoAn1.examservice.domain.requestDTO.questiongroup.ReqUpdateQuestionGroupItemsDTO;
 import com.DoAn1.examservice.domain.responseDTO.questiongroup.ResQuestionGroupDTO;
 import com.DoAn1.examservice.service.QuestionGroupService;
 import com.DoAn1.examservice.util.annotation.ApiMessage;
@@ -38,6 +40,14 @@ public class QuestionGroupController {
     @ApiMessage("Get question group by id")
     public ResQuestionGroupDTO getQuestionGroup(@PathVariable(name = "questionGroupUuid") UUID questionGroupUuid) {
         return questionGroupService.getQuestionGroup(questionGroupUuid);
+    }
+
+    @PutMapping("/{questionGroupUuid}/items")
+    @ApiMessage("Update question group items")
+    public ResQuestionGroupDTO updateQuestionGroupItems(
+            @PathVariable(name = "questionGroupUuid") UUID questionGroupUuid,
+            @Valid @RequestBody ReqUpdateQuestionGroupItemsDTO request) {
+        return questionGroupService.updateQuestionGroupItems(questionGroupUuid, request);
     }
 
     @GetMapping

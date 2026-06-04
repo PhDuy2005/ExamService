@@ -11,6 +11,7 @@ Module `Question Group` dùng để quản lý nhóm câu hỏi tái sử dụng
 Hiện tại module này hỗ trợ:
 
 - tạo `question group`
+- thay thế danh sách câu hỏi trong `question group`
 - lấy chi tiết `question group`
 - tìm kiếm danh sách `question group`
 
@@ -96,6 +97,7 @@ Ví dụ:
       "questionDetail": {
         "questionUuid": "uuid",
         "questionContent": "string",
+        "imagePath": "string | null",
         "questionTopic": "string | null",
         "questionType": "MCQ | TFQ | SAQ"
       }
@@ -323,6 +325,88 @@ Do backend đang trả `Page<ResQuestionGroupDTO>`, dữ liệu trong `data` là
 
 ---
 
+## 5.4. Thay thế danh sách câu hỏi trong question group
+
+### Đường dẫn
+
+`PUT /api/v1/question-groups/{questionGroupUuid}/items`
+
+### Mô tả luồng
+
+Nhận `questionGroupUuid` và danh sách `items` mới -> kiểm tra group tồn tại -> kiểm tra danh sách không rỗng và không trùng `questionUuid` -> kiểm tra toàn bộ câu hỏi tồn tại, đúng `questionType` và `questionTopic` của group -> xóa toàn bộ item cũ -> lưu toàn bộ item mới -> tự cập nhật `questionCount` -> trả chi tiết group sau khi cập nhật.
+
+API sử dụng cơ chế **thay thế toàn bộ danh sách**:
+
+- thêm câu hỏi: gửi danh sách cũ kèm câu mới
+- xóa câu hỏi: gửi danh sách không còn câu cần xóa
+- đổi câu hỏi: thay `questionUuid` cũ bằng `questionUuid` mới
+- không cần gửi `questionCount`; backend tự tính theo số phần tử trong `items`
+
+### Input format
+
+```json
+{
+  "items": [
+    {
+      "questionUuid": "018f4a70-2222-7c11-8aa1-7c5d5b5b0202"
+    },
+    {
+      "questionUuid": "018f4a70-2222-7c11-8aa1-7c5d5b5b0204"
+    }
+  ]
+}
+```
+
+### Output format
+
+Trả `ResQuestionGroupDTO` với danh sách item mới và `questionCount` đã được cập nhật.
+
+```json
+{
+  "statusCode": 200,
+  "message": "Update question group items",
+  "data": {
+    "questionGroupUuid": "uuid",
+    "groupName": "Tích phân",
+    "questionType": "MCQ",
+    "questionTopic": "Tích phân",
+    "questionCount": 2,
+    "items": [
+      {
+        "questionGroupItemUuid": "uuid",
+        "questionUuid": "018f4a70-2222-7c11-8aa1-7c5d5b5b0202",
+        "questionDetail": {
+          "questionUuid": "018f4a70-2222-7c11-8aa1-7c5d5b5b0202",
+          "questionContent": "string",
+          "imagePath": null,
+          "questionTopic": "Tích phân",
+          "questionType": "MCQ"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Exception có thể trả về
+
+#### `400 Bad Request`
+
+- `Question group not found with id: {questionGroupUuid}`
+- `Group items are required`
+- `Question id is required`
+- `Question group must contain at least one item`
+- `Question ids in a question group must be unique`
+- `Question not found with id: {questionUuid}`
+- `Question group type must match item question type for question id: {questionUuid}`
+- `Question group topic must match item question topic for question id: {questionUuid}`
+
+### Lưu ý tích hợp với Exam
+
+Việc cập nhật group gốc không thay đổi các `ExamQuestionGroup` và `ExamQuestionGroupItem` đã được snapshot vào đề trước đó. Muốn đề sử dụng danh sách mới, frontend cần cập nhật lại đề.
+
+---
+
 ## 6. Luồng liên quan module khác
 
 ### 6.1. Liên quan `Question Module`
@@ -386,6 +470,14 @@ Chưa lưu:
 
 Vì 3 field này thuộc ngữ cảnh của `Exam`, không phải thuộc ngữ cảnh của group gốc.
 
+### 7.4. Khi thay đổi câu hỏi trong group
+
+Frontend phải gửi toàn bộ danh sách câu hỏi mong muốn qua:
+
+- `PUT /api/v1/question-groups/{questionGroupUuid}/items`
+
+Không gửi riêng item cần thêm hoặc xóa, vì API sử dụng cơ chế thay thế toàn bộ danh sách.
+
 ---
 
 ## 8. Gợi ý kiểm thử frontend
@@ -419,3 +511,15 @@ Vì 3 field này thuộc ngữ cảnh của `Exam`, không phải thuộc ngữ 
 - tạo đề dùng `questionGroupUuid`
 - tạo đề dùng `newQuestionGroup`
 - tạo đề dùng kết hợp cả 2 cách
+
+### 8.5. Cập nhật danh sách câu hỏi
+
+- thêm một câu hỏi hợp lệ
+- xóa một câu hỏi nhưng group vẫn còn ít nhất một item
+- thay một câu hỏi bằng câu khác
+- gửi danh sách rỗng
+- gửi trùng `questionUuid`
+- gửi câu hỏi sai `questionType`
+- gửi câu hỏi sai `questionTopic`
+- xác nhận `questionCount` được backend tự cập nhật
+- xác nhận đề đã snapshot group trước đó không bị thay đổi
