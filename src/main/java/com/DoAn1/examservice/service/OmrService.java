@@ -1,6 +1,8 @@
 package com.DoAn1.examservice.service;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -33,6 +35,7 @@ import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperQuestionDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResOmrImportDTO;
 import com.DoAn1.examservice.exception.IdInvalidException;
+import com.DoAn1.examservice.exception.StorageException;
 import com.DoAn1.examservice.repository.ExamPaperRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupItemRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupRepository;
@@ -61,6 +64,7 @@ public class OmrService {
     private final QuestionRepository questionRepository;
     private final ExamAttemptService examAttemptService;
     private final ExamPaperPdfService examPaperPdfService;
+    private final FileService fileService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -95,6 +99,25 @@ public class OmrService {
                 .stream()
                 .map(paper -> buildPaperResponse(paper, deserializeSnapshots(paper.getQuestionSnapshotJson())))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ExamPaperPdfFile getExamPaperPdfFile(UUID examUuid, String paperCode) {
+        findExamById(examUuid);
+        String normalizedPaperCode = normalizePaperCode(paperCode);
+        ExamPaper paper = examPaperRepository.findByExamUuidAndPaperCode(examUuid, normalizedPaperCode)
+                .orElseThrow(() -> new IdInvalidException("Exam paper not found with code: " + normalizedPaperCode));
+
+        if (!StringUtils.hasText(paper.getPdfUrl())) {
+            throw new StorageException("Exam paper PDF is not available");
+        }
+
+        Path pdfPath = fileService.resolveStorageUrl(paper.getPdfUrl());
+        if (!Files.isRegularFile(pdfPath)) {
+            throw new StorageException("Exam paper PDF file not found");
+        }
+
+        return new ExamPaperPdfFile(paper.getPaperCode(), pdfPath);
     }
 
     @Transactional
@@ -311,6 +334,9 @@ public class OmrService {
 
     private String normalizeExternalSubmissionId(String externalSubmissionId) {
         return StringUtils.hasText(externalSubmissionId) ? externalSubmissionId.trim() : null;
+    }
+
+    public record ExamPaperPdfFile(String paperCode, Path path) {
     }
 
     private record PaperQuestionSnapshot(
