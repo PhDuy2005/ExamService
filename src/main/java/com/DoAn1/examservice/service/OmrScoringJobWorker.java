@@ -3,6 +3,7 @@ package com.DoAn1.examservice.service;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -42,11 +43,17 @@ public class OmrScoringJobWorker {
     @Value("${examservice.scoring-service.port:50051}")
     private Integer scoringServicePort;
 
+    @Value("${examservice.scoring-service.timeout-seconds:90}")
+    private Long scoringServiceTimeoutSeconds;
+
     @Value("${examservice.management-service.host:localhost}")
     private String managementServiceHost;
 
     @Value("${examservice.management-service.port:9092}")
     private Integer managementServicePort;
+
+    @Value("${examservice.management-service.timeout-seconds:20}")
+    private Long managementServiceTimeoutSeconds;
 
     private final OmrScoringJobRepository omrScoringJobRepository;
     private final OmrScoringJobResultRepository omrScoringJobResultRepository;
@@ -79,7 +86,8 @@ public class OmrScoringJobWorker {
 
         try {
             ScoringNormalServiceGrpc.ScoringNormalServiceBlockingStub stub = ScoringNormalServiceGrpc
-                    .newBlockingStub(channel);
+                    .newBlockingStub(channel)
+                    .withDeadlineAfter(scoringServiceTimeoutSeconds, TimeUnit.SECONDS);
             ScoringNormal.ReadOmrRequest request = ScoringNormal.ReadOmrRequest.newBuilder()
                     .setRequestId(job.getJobUuid().toString())
                     .setExamUuid(job.getExamUuid().toString())
@@ -244,7 +252,8 @@ public class OmrScoringJobWorker {
 
         try {
             StudentResolverServiceGrpc.StudentResolverServiceBlockingStub stub = StudentResolverServiceGrpc
-                    .newBlockingStub(channel);
+                    .newBlockingStub(channel)
+                    .withDeadlineAfter(managementServiceTimeoutSeconds, TimeUnit.SECONDS);
             StudentResolver.ResolveStudentsRequest request = StudentResolver.ResolveStudentsRequest.newBuilder()
                     .setSchoolYear(schoolYear)
                     .addStudentIds(studentCode)
