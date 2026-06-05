@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqCreateExamPaperDTO;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrImportDTO;
@@ -37,7 +36,7 @@ public class OmrController {
     @PostMapping("/api/v1/omr/exam-papers")
     @ApiMessage("Create OMR exam paper")
     public ResExamPaperDTO createExamPaper(@Valid @RequestBody ReqCreateExamPaperDTO request) {
-        return withAbsolutePdfUrl(omrService.createExamPaper(request));
+        return omrService.createExamPaper(request);
     }
 
     @GetMapping("/api/v1/omr/exams/{examUuid}/exam-papers")
@@ -70,18 +69,5 @@ public class OmrController {
     @ApiMessage("Import OMR data")
     public ResOmrImportDTO importOmrData(@Valid @RequestBody ReqOmrImportDTO request) {
         return omrService.importOmrData(request);
-    }
-
-    private ResExamPaperDTO withAbsolutePdfUrl(ResExamPaperDTO response) {
-        String pdfUrl = response.getPdfUrl();
-        if (pdfUrl == null || pdfUrl.startsWith("http://") || pdfUrl.startsWith("https://")) {
-            return response;
-        }
-
-        String normalizedPath = pdfUrl.startsWith("/") ? pdfUrl : "/" + pdfUrl;
-        response.setPdfUrl(ServletUriComponentsBuilder.fromCurrentContextPath()
-                .path(normalizedPath)
-                .toUriString());
-        return response;
     }
 }
