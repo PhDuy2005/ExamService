@@ -118,7 +118,7 @@ public class ExamAttemptService {
     @Transactional
     public ResExamAttemptDTO getAttempt(UUID attemptUuid) {
         ExamAttempt attempt = findAttemptById(attemptUuid);
-        validateAttemptOwnership(attempt);
+        validateAttemptViewPermission(attempt);
         Exam exam = findExamById(attempt.getExamUuid());
         Instant now = Instant.now();
         attempt = autoSubmitIfExpired(attempt, exam, now);
@@ -280,6 +280,14 @@ public class ExamAttemptService {
         if (!attempt.getStudentUuid().equals(currentStudentUuid)) {
             throw new IdInvalidException("You do not have permission to access this attempt");
         }
+    }
+
+    private void validateAttemptViewPermission(ExamAttempt attempt) {
+        String roleName = resolveCurrentRoleName();
+        if (!"STUDENT".equals(roleName)) {
+            return;
+        }
+        validateAttemptOwnership(attempt);
     }
 
     private void validateExamAttemptCanStart(Exam exam, UUID studentUuid) {
@@ -818,13 +826,17 @@ public class ExamAttemptService {
                 .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
-    private StudentIdentity resolveCurrentStudentIdentity() {
-        UUID studentUuid = resolveCurrentStudentUuid();
-        String roleName = SecurityUtil.getCurrentRoleName()
+    private String resolveCurrentRoleName() {
+        return SecurityUtil.getCurrentRoleName()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
                 .map(String::toUpperCase)
                 .orElseThrow(() -> new IdInvalidException("Role name is missing from JWT"));
+    }
+
+    private StudentIdentity resolveCurrentStudentIdentity() {
+        UUID studentUuid = resolveCurrentStudentUuid();
+        String roleName = resolveCurrentRoleName();
         String studentFullname = SecurityUtil.getCurrentUserFullName()
                 .filter(StringUtils::hasText)
                 .orElseThrow(() -> new IdInvalidException("User full name is missing from JWT"));

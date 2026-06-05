@@ -7,6 +7,8 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 import com.DoAn1.examservice.domain.entity.OmrScoringJob;
 import com.DoAn1.examservice.domain.entity.OmrScoringJobResult;
@@ -18,9 +20,12 @@ import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrSectionsDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResOmrImportDTO;
 import com.DoAn1.examservice.repository.OmrScoringJobRepository;
 import com.DoAn1.examservice.repository.OmrScoringJobResultRepository;
+import com.DoAn1.examservice.service.event.OmrScoringJobCreatedEvent;
 
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Status;
+import io.grpc.StatusRuntimeException;
 import lombok.extern.slf4j.Slf4j;
 import management.v1.StudentResolver;
 import management.v1.StudentResolverServiceGrpc;
@@ -57,6 +62,11 @@ public class OmrScoringJobWorker {
     }
 
     @Async
+    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+    public void handleJobCreated(OmrScoringJobCreatedEvent event) {
+        processJob(event.jobUuid());
+    }
+
     public void processJob(UUID jobUuid) {
         log.info("Processing OMR scoring job: jobUuid={}", jobUuid);
         OmrScoringJob job = omrScoringJobRepository.findByJobUuid(jobUuid)
@@ -84,6 +94,13 @@ public class OmrScoringJobWorker {
             omrScoringJobRepository.save(job);
             log.info("OMR scoring job processed successfully: jobUuid={}, examUuid={}, status={}",
                     job.getJobUuid(), job.getExamUuid(), job.getStatus());
+        } catch (StatusRuntimeException ex) {
+            String errorMessage = buildGrpcErrorMessage("Scoring service", ex);
+            log.error("Processing OMR scoring job failed by gRPC error: jobUuid={}, examUuid={}, code={}, message={}",
+                    jobUuid, job.getExamUuid(), ex.getStatus().getCode(), errorMessage, ex);
+            job.setStatus(OmrScoringJobStatus.FAILED);
+            job.setErrorMessage(errorMessage);
+            omrScoringJobRepository.save(job);
         } catch (Exception ex) {
             log.error("Processing OMR scoring job failed: jobUuid={}, examUuid={}, message={}",
                     jobUuid, job.getExamUuid(), ex.getMessage(), ex);
@@ -232,7 +249,12 @@ public class OmrScoringJobWorker {
                     .setSchoolYear(schoolYear)
                     .addStudentIds(studentCode)
                     .build();
-            StudentResolver.ResolveStudentsResponse response = stub.resolveStudents(request);
+            StudentResolver.ResolveStudentsResponse response;
+            try {
+                response = stub.resolveStudents(request);
+            } catch (StatusRuntimeException ex) {
+                throw mapStudentResolverGrpcException(studentCode, ex);
+            }
 
             if (response.getUnresolvedStudentIdsList().contains(studentCode)) {
                 throw new IllegalArgumentException("Student code could not be resolved: " + studentCode);
@@ -250,6 +272,33 @@ public class OmrScoringJobWorker {
         } finally {
             channel.shutdown();
         }
+    }
+
+    private RuntimeException mapStudentResolverGrpcException(String studentCode, StatusRuntimeException ex) {
+        Status.Code code = ex.getStatus().getCode();
+        String errorMessage = buildGrpcErrorMessage("Management service", ex);
+        log.warn("Student resolver gRPC call failed: studentCode={}, code={}, message={}",
+                studentCode, code, errorMessage, ex);
+
+        if (code == Status.Code.INVALID_ARGUMENT || code == Status.Code.NOT_FOUND) {
+            return new IllegalArgumentException(errorMessage, ex);
+        }
+
+        if (code == Status.Code.UNKNOWN) {
+            return new IllegalStateException(errorMessage
+                    + ". Management service may be throwing an unhandled server-side exception.", ex);
+        }
+
+        return new IllegalStateException(errorMessage, ex);
+    }
+
+    private String buildGrpcErrorMessage(String serviceName, StatusRuntimeException ex) {
+        Status status = ex.getStatus();
+        String description = hasText(status.getDescription())
+                ? status.getDescription()
+                : ex.getMessage();
+        return serviceName + " gRPC failed with status " + status.getCode()
+                + (hasText(description) ? ": " + description : "");
     }
 
     private UUID parseUserUuid(StudentResolver.ResolvedStudent student) {

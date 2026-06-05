@@ -186,9 +186,25 @@ class ExamAttemptServiceTest {
         verify(examAttemptRepository).save(attempt);
     }
 
+    @Test
+    void nonStudentRoleCanViewAttemptOwnedByAnotherStudent() {
+        attempt.setStatus(AttemptStatus.SUBMITTED);
+        exam.setEndTime(Instant.now().plusSeconds(600));
+
+        try (MockedStatic<SecurityUtil> securityUtil = mockStatic(SecurityUtil.class)) {
+            securityUtil.when(SecurityUtil::getCurrentRoleName).thenReturn(Optional.of("TEACHER"));
+
+            ResExamAttemptDTO response = examAttemptService.getAttempt(attemptUuid);
+
+            assertThat(response.getAttemptUuid()).isEqualTo(attemptUuid);
+            assertThat(response.getStudentUuid()).isEqualTo(studentUuid);
+        }
+    }
+
     private ResExamAttemptDTO getAttemptAsCurrentStudent() {
         try (MockedStatic<SecurityUtil> securityUtil = mockStatic(SecurityUtil.class)) {
             securityUtil.when(SecurityUtil::getCurrentUserUuid).thenReturn(Optional.of(studentUuid.toString()));
+            securityUtil.when(SecurityUtil::getCurrentRoleName).thenReturn(Optional.of("STUDENT"));
             return examAttemptService.getAttempt(attemptUuid);
         }
     }
