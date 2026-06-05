@@ -1,8 +1,11 @@
-# Luồng Chấm OMR Qua Scoring Service
+﻿# Luồng Chấm OMR Qua Scoring Service
 
 ## 1. Quyết định nghiệp vụ
 
 - User upload file `.pdf` lên `ExamService`.
+- Người upload file thường là giáo viên/manager, không nhất thiết là học sinh.
+- Một file `.pdf` có thể chứa nhiều bài làm của nhiều học sinh trong cùng một exam.
+- Các bài làm trong cùng file có thể cùng `paperCode` hoặc khác `paperCode`.
 - `ExamService` xử lý bất đồng bộ, không chờ chấm xong trong request đầu tiên.
 - `attemptUuid` chỉ được tạo sau khi `ExamService` đã nhận đủ extracted data từ `ScoringService`.
 - Trước khi có `attemptUuid`, frontend theo dõi tiến trình bằng `jobUuid`.
@@ -20,7 +23,7 @@
 User
  ↓
 POST /api/v1/omr/scoring-jobs
-multipart/form-data: file(.pdf), examUuid, paperCode, studentUuid
+multipart/form-data: file(.pdf), examUuid
  ↓
 ES validate request
  ↓
@@ -31,16 +34,16 @@ ES lưu PDF gốc vào storage
 ES đọc số trang PDF
  ↓
 ES tạo OmrScoringJob(status=PENDING/PROCESSING)
-Lưu: jobUuid, examUuid, paperCode, studentUuid, rawImageUrl/rawFileUrl, pageCount
+Lưu: jobUuid, examUuid, rawImageUrl/rawFileUrl, pageCount
 Chưa tạo ExamAttempt
  ↓
 ES trả 202 Accepted
-Response: jobUuid, status, pageCount, attemptUuid=null
+Response: jobUuid, status, pageCount, resultCount=0, results=[]
  ↓
 ES xử lý async job
  ↓
 ES gọi SS qua gRPC server streaming
-Request: jobUuid, examUuid, paperCode, rawFileUrl/rawFileKey, pageCount
+Request: jobUuid, examUuid, rawFileUrl/rawFileKey, pageCount
  ↓
 SS đọc PDF gốc từ storage
  ↓
@@ -52,28 +55,30 @@ SS stream extracted result về ES
  ↓
 ES nhận n response từ SS
  ↓
-ES gom extracted data thành sections.mcq, sections.tfq, sections.saq
+ES gom extracted data thành nhiều submission, mỗi submission có paperCode, studentCode, sections.mcq, sections.tfq, sections.saq
+ ↓
+ES resolve studentCode + schoolYear sang userUuid và fullname qua MS gRPC
  ↓
 ES cập nhật OmrScoringJob(status=EXTRACTED/IMPORTING)
  ↓
 ES gọi logic import OMR nội bộ
  ↓
-ES tạo ExamAttempt(submitSource=OMR_IMPORT)
+ES tạo một ExamAttempt(submitSource=OMR_IMPORT) cho từng submission hợp lệ
  ↓
 ES lưu StudentAnswer
  ↓
 ES chấm điểm
  ↓
-ES cập nhật ExamAttempt.score, rawImageUrl, scoredImageUrl
+ES cập nhật ExamAttempt.score, rawImageUrl, scoredImageUrl cho từng submission
  ↓
 ES lưu OmrImport audit log
  ↓
-ES cập nhật OmrScoringJob(status=COMPLETED, attemptUuid, score, scoredImageUrl)
+ES tạo/cập nhật OmrScoringJobResult cho từng submission, sau đó cập nhật OmrScoringJob(status=COMPLETED)
  ↓
 User polling:
 GET /api/v1/omr/scoring-jobs/{jobUuid}
  ↓
-ES trả trạng thái job, attemptUuid nếu đã có, score, rawImageUrl, scoredImageUrl
+ES trả trạng thái job, pageCount, rawImageUrl và danh sách kết quả từng bài làm
 ```
 
 ---
@@ -92,9 +97,9 @@ Content-Type: multipart/form-data
 ```text
 file: bài làm OMR dạng .pdf
 examUuid: uuid
-paperCode: M001
-studentUuid: uuid
 ```
+
+`paperCode` và `studentCode` không gửi ở bước này vì file PDF là một batch nhiều bài làm. SS sẽ extract các thông tin này cho từng bài làm/trang. `schoolYear` không do SS biết; ES lấy từ `Exam.schoolYear` theo `examUuid` và lưu snapshot vào `OmrScoringJob`.
 
 ### Validate tại ES
 
@@ -102,9 +107,8 @@ studentUuid: uuid
 - `file` phải là `.pdf`.
 - MIME type nên là `application/pdf`.
 - `examUuid` bắt buộc.
-- `paperCode` bắt buộc.
-- `studentUuid` bắt buộc.
-- `ExamPaper` phải tồn tại theo `examUuid + paperCode`.
+- `Exam` phải tồn tại theo `examUuid`.
+- `Exam.schoolYear` phải có giá trị vì ES dùng `studentCode + schoolYear` để resolve học sinh.
 - ES đọc được số trang trong PDF.
 
 ---
@@ -120,14 +124,15 @@ Vì xử lý bất đồng bộ, response đầu tiên không trả điểm và 
   "data": {
     "jobUuid": "uuid",
     "examUuid": "uuid",
-    "paperCode": "M001",
-    "studentUuid": "uuid",
+    "schoolYear": "2025-2026",
     "status": "PROCESSING",
     "pageCount": 4,
     "rawImageUrl": "/storage/omr/raw/job-uuid.pdf",
     "scoredImageUrl": null,
-    "attemptUuid": null,
-    "score": null,
+    "resultCount": 0,
+    "completedCount": 0,
+    "failedCount": 0,
+    "results": [],
     "createdAt": "2026-06-01T10:00:00Z",
     "updatedAt": "2026-06-01T10:00:00Z"
   }
@@ -137,8 +142,8 @@ Vì xử lý bất đồng bộ, response đầu tiên không trả điểm và 
 ### Ghi chú
 
 - `pageCount` là số trang của file `.pdf` user upload.
-- `attemptUuid = null` vì lúc này ES chưa có extracted data.
-- `attemptUuid` chỉ xuất hiện sau khi SS stream kết quả về và ES import/chấm xong.
+- `results` ban đầu rỗng vì lúc này ES chưa có extracted data.
+- `attemptUuid` chỉ xuất hiện trong từng result sau khi SS stream kết quả về và ES import/chấm xong bài làm tương ứng.
 
 ---
 
@@ -152,12 +157,31 @@ Unary request -> server streaming response
 
 ES gửi 1 request sang SS, SS trả nhiều response theo tiến trình hoặc theo từng page/section.
 
+### Proto đang dùng
+
+```text
+D:\DoAn\DoAn1\proto\scoring\v1\scoring_normal.proto
+```
+
+Từ project `ExamService\ExamService`, đường dẫn tương đối là:
+
+```text
+..\..\proto\scoring\v1\scoring_normal.proto
+```
+
+Service:
+
+```proto
+service ScoringNormalService {
+  rpc ReadOmr(ReadOmrRequest) returns (stream ReadOmrResponse);
+}
+```
+
 ### Request ES gửi sang SS
 
 ```text
 jobUuid
 examUuid
-paperCode
 rawFileUrl/rawFileKey
 pageCount
 ```
@@ -167,8 +191,8 @@ pageCount
 Mỗi response có thể là:
 
 - progress update
-- extracted data của một trang
-- extracted data của một section
+- extracted data của một bài làm/trang
+- extracted data của một section trong bài làm
 - scored image URL
 - final result
 - error
@@ -187,13 +211,13 @@ EXTRACTION_COMPLETED
 
 ## 6. Dữ Liệu Extracted ES Cần Gom Được
 
-Sau khi nhận đủ stream từ SS, ES cần gom được data tương đương input import OMR hiện tại:
+Sau khi nhận stream từ SS, ES cần gom được nhiều submission. Mỗi submission tương đương input import OMR hiện tại:
 
 ```json
 {
   "examUuid": "uuid",
   "paperCode": "M001",
-  "studentUuid": "uuid",
+  "studentCode": "12345",
   "externalSubmissionId": "jobUuid hoặc id từ SS",
   "rawImageUrl": "/storage/omr/raw/job-uuid.pdf",
   "scoredImageUrl": "/storage/omr/scored/job-uuid.pdf",
@@ -242,10 +266,12 @@ GET /api/v1/omr/scoring-jobs/{jobUuid}
     "jobUuid": "uuid",
     "status": "PROCESSING",
     "pageCount": 4,
-    "attemptUuid": null,
-    "score": null,
     "rawImageUrl": "/storage/omr/raw/job-uuid.pdf",
-    "scoredImageUrl": null
+    "scoredImageUrl": null,
+    "resultCount": 0,
+    "completedCount": 0,
+    "failedCount": 0,
+    "results": []
   }
 }
 ```
@@ -260,10 +286,41 @@ GET /api/v1/omr/scoring-jobs/{jobUuid}
     "jobUuid": "uuid",
     "status": "COMPLETED",
     "pageCount": 4,
-    "attemptUuid": "uuid",
-    "score": 8.5,
     "rawImageUrl": "/storage/omr/raw/job-uuid.pdf",
-    "scoredImageUrl": "/storage/omr/scored/job-uuid.pdf"
+    "scoredImageUrl": "/storage/omr/scored/job-uuid.pdf",
+    "resultCount": 2,
+    "completedCount": 2,
+    "failedCount": 0,
+    "results": [
+      {
+        "jobResultUuid": "uuid",
+        "pageNumber": 1,
+        "paperCode": "M001",
+        "studentCode": "12345",
+        "studentFullname": "Nguyễn Văn A",
+        "studentUuid": "uuid",
+        "attemptUuid": "uuid",
+        "status": "COMPLETED",
+        "score": 8.5,
+        "rawImageUrl": "/storage/omr/raw/page-1.pdf",
+        "scoredImageUrl": "/storage/omr/scored/page-1.jpg",
+        "errorMessage": null
+      },
+      {
+        "jobResultUuid": "uuid",
+        "pageNumber": 2,
+        "paperCode": "M002",
+        "studentCode": "54321",
+        "studentFullname": "Nguyễn Văn A",
+        "studentUuid": "uuid",
+        "attemptUuid": "uuid",
+        "status": "COMPLETED",
+        "score": 7.25,
+        "rawImageUrl": "/storage/omr/raw/page-2.pdf",
+        "scoredImageUrl": "/storage/omr/scored/page-2.jpg",
+        "errorMessage": null
+      }
+    ]
   }
 }
 ```
@@ -278,10 +335,12 @@ GET /api/v1/omr/scoring-jobs/{jobUuid}
     "jobUuid": "uuid",
     "status": "FAILED",
     "pageCount": 4,
-    "attemptUuid": null,
-    "score": null,
     "rawImageUrl": "/storage/omr/raw/job-uuid.pdf",
     "scoredImageUrl": null,
+    "resultCount": 0,
+    "completedCount": 0,
+    "failedCount": 0,
+    "results": [],
     "errorMessage": "Cannot extract OMR markers"
   }
 }
@@ -341,3 +400,5 @@ Client -> Gateway -> ES gRPC
 ```
 
 Trong thiết kế hiện tại, không cần 2 luồng này.
+
+

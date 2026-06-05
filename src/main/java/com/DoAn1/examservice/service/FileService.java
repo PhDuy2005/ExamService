@@ -44,6 +44,47 @@ public class FileService {
         return finalName;
     }
 
+    public String buildStorageUrl(String folder, String fileName) {
+        String cleanFolder = StringUtils.cleanPath(folder.trim()).replace("\\", "/");
+        String cleanFileName = StringUtils.cleanPath(fileName);
+        if (cleanFolder.startsWith("/") || cleanFolder.contains("..")
+                || cleanFileName.contains("..") || !StringUtils.hasText(cleanFileName)) {
+            throw new StorageException("Invalid storage path");
+        }
+        return "/storage/" + cleanFolder + "/" + cleanFileName;
+    }
+
+    public String storeBytes(byte[] content, String folder, String fileName) throws IOException {
+        String cleanFileName = StringUtils.cleanPath(fileName);
+        if (!StringUtils.hasText(cleanFileName) || cleanFileName.contains("..")) {
+            throw new StorageException("Invalid file name");
+        }
+
+        Path folderPath = resolveFolder(folder);
+        Files.createDirectories(folderPath);
+        Path targetPath = folderPath.resolve(cleanFileName).normalize();
+        if (!targetPath.startsWith(folderPath)) {
+            throw new StorageException("Cannot store file outside upload folder");
+        }
+
+        Files.write(targetPath, content);
+        return buildStorageUrl(folder, cleanFileName);
+    }
+
+    public Path resolveStorageUrl(String storageUrl) {
+        if (!StringUtils.hasText(storageUrl) || !storageUrl.startsWith("/storage/")) {
+            throw new StorageException("Invalid storage URL");
+        }
+
+        String relativePath = storageUrl.substring("/storage/".length());
+        Path rootPath = Path.of(baseURI).toAbsolutePath().normalize();
+        Path resolvedPath = rootPath.resolve(relativePath).normalize();
+        if (!resolvedPath.startsWith(rootPath)) {
+            throw new StorageException("Cannot access file outside storage root");
+        }
+        return resolvedPath;
+    }
+
     private Path resolveFolder(String folder) {
         if (!StringUtils.hasText(folder)) {
             throw new StorageException("Folder is required");

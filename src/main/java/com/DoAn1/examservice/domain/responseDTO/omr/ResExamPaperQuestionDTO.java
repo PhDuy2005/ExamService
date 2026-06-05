@@ -17,6 +17,7 @@ public class ResExamPaperQuestionDTO {
     private Integer sectionQuestionNumber;
     private UUID questionUuid;
     private QuestionType questionType;
+    private String imagePath;
     private BigDecimal score;
     private Boolean fromQuestionGroup;
     private UUID groupUuid;

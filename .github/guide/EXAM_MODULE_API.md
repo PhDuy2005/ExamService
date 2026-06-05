@@ -1,4 +1,4 @@
-# Exam Module API
+﻿# Exam Module API
 
 ## 1. Mục đích module
 
@@ -94,6 +94,7 @@ Hoặc với lỗi validation:
   "examUuid": "uuid",
   "examName": "string",
   "gradeId": 12,
+  "schoolYear": "2025-2026",
   "examType": "QUIZ | HOMEWORK | MOCK_TEST | OFFICIAL_TEST",
   "startTime": "2026-05-17T10:00:00Z | null",
   "endTime": "2026-05-17T11:00:00Z | null",
@@ -225,7 +226,17 @@ Nếu không truyền, backend sẽ gán mặc định:
 - `scorePerQuestion` là thuộc tính của đề, không phải thuộc tính của group gốc
 - `displayOrder` là thuộc tính của đề, không phải thuộc tính của group gốc
 
-### 4.5. Ý nghĩa `questionCount` và `pickQuestionCount`
+### 4.5. Rule không cho phép trùng câu hỏi trong đề
+
+- một `questionUuid` chỉ được xuất hiện đúng `1` lần trong toàn bộ đề
+- backend kiểm tra trùng giữa:
+  - `examQuestions`
+  - các item của mọi `examQuestionGroups`
+- nếu trùng, backend chặn ngay ở bước validate payload trước khi lưu database
+- message lỗi sẽ chỉ ra tất cả vị trí đang bị trùng, ví dụ:
+  - `Cau hoi <questionContent hoặc questionUuid> chi duoc xuat hien 1 lan trong de. Hien tai dang xuat hien tai: cau 1 - cau hoi le, cau 2 - Nhom Nguyen ham, cau 4 - Nhom Tich phan`
+
+### 4.6. Ý nghĩa `questionCount` và `pickQuestionCount`
 
 - `questionCount`: số câu hiện có trong pool của `question group`
 - `pickQuestionCount`: số câu sẽ được random ra khi học sinh bắt đầu `attempt`
@@ -252,7 +263,7 @@ thì:
 
 ### Mô tả luồng
 
-Tạo đề mới -> validate dữ liệu chung của đề -> validate phần trăm chấm `TFQ` -> validate danh sách câu hỏi lẻ -> resolve từng phần tử `examQuestionGroups` theo mode `questionGroupUuid` hoặc `newQuestionGroup` -> nếu là `newQuestionGroup` thì tạo `question group` riêng trước -> kiểm tra toàn bộ `questionUuid` có tồn tại và đúng loại hay không -> lưu `Exam` xuống database -> lưu `ExamQuestion` -> snapshot group vào `ExamQuestionGroup` và `ExamQuestionGroupItem` -> build `questionSummary` và `questionSections` -> trả kết quả
+ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần trăm chấm `TFQ` -> validate danh sách câu hỏi lẻ -> resolve từng phần tử `examQuestionGroups` theo mode `questionGroupUuid` hoặc `newQuestionGroup` -> nếu là `newQuestionGroup` thì tạo `question group` riêng trước -> kiểm tra toàn bộ `questionUuid` có tồn tại và đúng loại hay không -> kiểm tra không có câu hỏi nào bị trùng giữa câu hỏi lẻ và các group -> lưu `Exam` xuống database -> lưu `ExamQuestion` -> snapshot group vào `ExamQuestionGroup` và `ExamQuestionGroupItem` -> build `questionSummary` và `questionSections` -> trả kết quả
 
 ### Input format
 
@@ -260,6 +271,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 {
   "examName": "Đề kiểm tra Toán 15 phút",
   "gradeId": 12,
+  "schoolYear": "2025-2026",
   "examType": "QUIZ",
   "startTime": "2026-05-18T01:00:00Z",
   "endTime": "2026-05-18T01:15:00Z",
@@ -329,6 +341,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "gradeId": 12,
+    "schoolYear": "2025-2026",
     "examType": "QUIZ",
     "startTime": "2026-05-18T01:00:00Z",
     "endTime": "2026-05-18T01:15:00Z",
@@ -389,6 +402,7 @@ Tạo đề mới -> validate dữ liệu chung của đề -> validate phần t
 - `Question group topic must match item question topic for question id: {questionUuid}`
 - `Group question type must match item question type for question id: {questionUuid}`
 - `Group question topic must match item question topic for question id: {questionUuid}`
+- `Cau hoi {questionContent hoặc questionUuid} chi duoc xuat hien 1 lan trong de. Hien tai dang xuat hien tai: {vi tri 1}, {vi tri 2}, ...`
 
 #### `403 Forbidden`
 
@@ -431,6 +445,7 @@ Ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "string",
     "gradeId": 12,
+    "schoolYear": "2025-2026",
     "questionSummary": {
       "mcqCount": 10,
       "tfqCount": 4,
@@ -528,7 +543,7 @@ Do backend đang trả `Page<ResExamDTO>`, dữ liệu trong `data` là object p
 
 ### Mô tả luồng
 
-Nhận `examUuid` và payload mới -> kiểm tra đề có tồn tại không -> validate toàn bộ dữ liệu giống API tạo đề -> cập nhật bản ghi `Exam` -> xóa toàn bộ snapshot câu hỏi cũ của đề -> tạo lại snapshot mới từ payload -> build response -> trả kết quả
+Nhận `examUuid` và payload mới -> kiểm tra đề có tồn tại không -> validate toàn bộ dữ liệu giống API tạo đề, bao gồm rule không cho phép trùng câu hỏi giữa câu lẻ và group -> cập nhật bản ghi `Exam` -> xóa toàn bộ snapshot câu hỏi cũ của đề -> tạo lại snapshot mới từ payload -> build response -> trả kết quả
 
 ### Input format
 
@@ -689,6 +704,8 @@ Một loại như `MCQ` có thể có nhiều group khác nhau, ví dụ:
 - `endTime` nhỏ hơn `startTime`
 - `questionOrder` bị trùng
 - `displayOrder` bị trùng
+- cùng một `questionUuid` xuất hiện ở cả `examQuestions` và `examQuestionGroups`
+- cùng một `questionUuid` xuất hiện ở 2 group khác nhau trong cùng đề
 - cùng lúc truyền cả `questionGroupUuid` và `newQuestionGroup`
 - không truyền cả `questionGroupUuid` lẫn `newQuestionGroup`
 - `pickQuestionCount > questionCount`

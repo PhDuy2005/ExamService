@@ -119,13 +119,14 @@ public class QuestionService {
     }
 
     private Question findQuestionById(UUID questionUuid) {
-        return questionRepository.findById(questionUuid)
+        return questionRepository.findByQuestionUuid(questionUuid)
                 .orElseThrow(() -> new IdInvalidException("Question not found with id: " + questionUuid));
     }
 
     private void applyQuestionData(Question question, ReqCreateQuestionDTO request) {
         question.setGradeId(request.getGradeId());
         question.setQuestionContent(request.getQuestionContent().trim());
+        question.setImagePath(StringUtils.hasText(request.getImagePath()) ? request.getImagePath().trim() : null);
         question.setQuestionTopic(
                 StringUtils.hasText(request.getQuestionTopic()) ? request.getQuestionTopic().trim() : null);
         question.setQuestionType(request.getQuestionType());
@@ -348,6 +349,7 @@ public class QuestionService {
                 .questionUuid(question.getQuestionUuid())
                 .gradeId(question.getGradeId())
                 .questionContent(question.getQuestionContent())
+                .imagePath(question.getImagePath())
                 .questionTopic(question.getQuestionTopic())
                 .questionType(question.getQuestionType())
                 .createdByUserUuid(question.getCreatedByUserUuid())

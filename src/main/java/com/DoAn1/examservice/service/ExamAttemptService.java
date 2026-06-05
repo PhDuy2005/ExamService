@@ -45,6 +45,7 @@ import com.DoAn1.examservice.domain.responseDTO.attempt.ResExamAttemptDTO;
 import com.DoAn1.examservice.domain.responseDTO.attempt.ResExamAttemptSummaryDTO;
 import com.DoAn1.examservice.exception.IdInvalidException;
 import com.DoAn1.examservice.repository.ExamAttemptRepository;
+import com.DoAn1.examservice.repository.ExamProctoringEventRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupItemRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupRepository;
 import com.DoAn1.examservice.repository.ExamQuestionRepository;
@@ -55,6 +56,7 @@ import com.DoAn1.examservice.repository.QuestionRepository;
 import com.DoAn1.examservice.repository.QuestionTrueFalseStatementRepository;
 import com.DoAn1.examservice.repository.StudentAnswerRepository;
 import com.DoAn1.examservice.util.SecurityUtil;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -65,11 +67,18 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class ExamAttemptService {
 
+    private static final Set<String> NON_STUDENT_ATTEMPT_ROLES = Set.of(
+            "TEACHER",
+            "TA",
+            "COLAB_TEACHER",
+            "MANAGER");
+
     private final ExamRepository examRepository;
     private final ExamQuestionRepository examQuestionRepository;
     private final ExamQuestionGroupRepository examQuestionGroupRepository;
     private final ExamQuestionGroupItemRepository examQuestionGroupItemRepository;
     private final ExamAttemptRepository examAttemptRepository;
+    private final ExamProctoringEventRepository examProctoringEventRepository;
     private final StudentAnswerRepository studentAnswerRepository;
     private final QuestionRepository questionRepository;
     private final QuestionMcOptionRepository questionMcOptionRepository;
@@ -79,7 +88,8 @@ public class ExamAttemptService {
 
     @Transactional
     public ResExamAttemptDTO startAttempt(UUID examUuid) {
-        UUID studentUuid = resolveCurrentStudentUuid();
+        StudentIdentity studentIdentity = resolveCurrentStudentIdentity();
+        UUID studentUuid = studentIdentity.studentUuid();
         Exam exam = findExamById(examUuid);
         validateExamAttemptCanStart(exam, studentUuid);
 
@@ -92,6 +102,8 @@ public class ExamAttemptService {
         ExamAttempt attempt = new ExamAttempt();
         attempt.setExamUuid(examUuid);
         attempt.setStudentUuid(studentUuid);
+        attempt.setStudentId(studentIdentity.studentId());
+        attempt.setStudentFullname(studentIdentity.studentFullname());
         attempt.setAttemptNo(nextAttemptNo);
         attempt.setStartedAt(Instant.now());
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
@@ -103,12 +115,14 @@ public class ExamAttemptService {
         return buildAttemptResponse(savedAttempt, exam);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public ResExamAttemptDTO getAttempt(UUID attemptUuid) {
         ExamAttempt attempt = findAttemptById(attemptUuid);
-        validateAttemptOwnership(attempt);
+        validateAttemptViewPermission(attempt);
         Exam exam = findExamById(attempt.getExamUuid());
-        attempt = autoSubmitIfExpired(attempt, exam);
+        Instant now = Instant.now();
+        attempt = autoSubmitIfExpired(attempt, exam, now);
+        attempt = releaseAnswersIfExamEnded(attempt, exam, now);
         return buildAttemptResponse(attempt, exam);
     }
 
@@ -180,6 +194,8 @@ public class ExamAttemptService {
     public ResExamAttemptDTO importOmrAttempt(
             UUID examUuid,
             UUID studentUuid,
+            String studentId,
+            String studentFullname,
             String questionSnapshotJson,
             Map<Integer, String> rawAnswerByQuestionOrder,
             String rawImageUrl,
@@ -203,6 +219,8 @@ public class ExamAttemptService {
         ExamAttempt attempt = new ExamAttempt();
         attempt.setExamUuid(examUuid);
         attempt.setStudentUuid(studentUuid);
+        attempt.setStudentId(studentId);
+        attempt.setStudentFullname(studentFullname);
         attempt.setAttemptNo(nextAttemptNo);
         attempt.setStartedAt(Instant.now());
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
@@ -248,12 +266,12 @@ public class ExamAttemptService {
     }
 
     private Exam findExamById(UUID examUuid) {
-        return examRepository.findById(examUuid)
+        return examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
     }
 
     private ExamAttempt findAttemptById(UUID attemptUuid) {
-        return examAttemptRepository.findById(attemptUuid)
+        return examAttemptRepository.findByAttemptUuid(attemptUuid)
                 .orElseThrow(() -> new IdInvalidException("Attempt not found with id: " + attemptUuid));
     }
 
@@ -262,6 +280,14 @@ public class ExamAttemptService {
         if (!attempt.getStudentUuid().equals(currentStudentUuid)) {
             throw new IdInvalidException("You do not have permission to access this attempt");
         }
+    }
+
+    private void validateAttemptViewPermission(ExamAttempt attempt) {
+        String roleName = resolveCurrentRoleName();
+        if (!"STUDENT".equals(roleName)) {
+            return;
+        }
+        validateAttemptOwnership(attempt);
     }
 
     private void validateExamAttemptCanStart(Exam exam, UUID studentUuid) {
@@ -291,13 +317,32 @@ public class ExamAttemptService {
     }
 
     private ExamAttempt autoSubmitIfExpired(ExamAttempt attempt, Exam exam) {
+        return autoSubmitIfExpired(attempt, exam, Instant.now());
+    }
+
+    private ExamAttempt autoSubmitIfExpired(ExamAttempt attempt, Exam exam, Instant now) {
         if (attempt.getStatus() != AttemptStatus.IN_PROGRESS) {
             return attempt;
         }
-        if (!isAttemptExpired(attempt, exam, Instant.now())) {
+        if (!isAttemptExpired(attempt, exam, now)) {
             return attempt;
         }
         return finalizeAttempt(attempt, exam, true);
+    }
+
+    private ExamAttempt releaseAnswersIfExamEnded(ExamAttempt attempt, Exam exam, Instant now) {
+        if (attempt.getStatus() == AttemptStatus.ANSWER_RELEASED) {
+            return attempt;
+        }
+        if (exam.getEndTime() == null || !exam.getEndTime().isBefore(now)) {
+            return attempt;
+        }
+        if (attempt.getStatus() != AttemptStatus.SUBMITTED && attempt.getStatus() != AttemptStatus.SCORED) {
+            return attempt;
+        }
+
+        attempt.setStatus(AttemptStatus.ANSWER_RELEASED);
+        return examAttemptRepository.save(attempt);
     }
 
     private List<AttemptQuestionSnapshot> buildAttemptQuestionSnapshots(UUID examUuid) {
@@ -361,10 +406,17 @@ public class ExamAttemptService {
                 .stream()
                 .collect(Collectors.groupingBy(StudentAnswer::getQuestionUuid, LinkedHashMap::new, Collectors.toList()));
 
+        boolean answersReleased = attempt.getStatus() == AttemptStatus.ANSWER_RELEASED;
+        Map<UUID, QuestionAnswerKey> answerKeyByQuestion = answersReleased
+                ? questionAnswerKeyRepository.findByQuestionUuidIn(new ArrayList<>(questionIds))
+                        .stream()
+                        .collect(Collectors.toMap(QuestionAnswerKey::getQuestionUuid, Function.identity()))
+                : Map.of();
+
         List<ResAttemptQuestionDTO> questions = snapshots.stream()
                 .sorted(Comparator.comparing(AttemptQuestionSnapshot::questionOrder))
                 .map(snapshot -> buildAttemptQuestionResponse(snapshot, questionById, optionsByQuestion, statementsByQuestion,
-                        answerHistoryByQuestion))
+                        answerHistoryByQuestion, answerKeyByQuestion, exam, attempt.getSubmitSource(), answersReleased))
                 .toList();
 
         return ResExamAttemptDTO.builder()
@@ -372,13 +424,16 @@ public class ExamAttemptService {
                 .examUuid(attempt.getExamUuid())
                 .examName(exam.getExamName())
                 .studentUuid(attempt.getStudentUuid())
+                .studentId(attempt.getStudentId())
+                .studentFullname(attempt.getStudentFullname())
                 .attemptNo(attempt.getAttemptNo())
                 .startedAt(attempt.getStartedAt())
                 .submittedAt(attempt.getSubmittedAt())
                 .timeSpentSeconds(attempt.getTimeSpentSeconds())
                 .status(attempt.getStatus())
-                .score(attempt.getScore())
+                .score(isAttemptScoreVisible(attempt.getStatus()) ? attempt.getScore() : null)
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
                 .scoredImageUrl(attempt.getScoredImageUrl())
                 .questions(questions)
@@ -390,13 +445,16 @@ public class ExamAttemptService {
                 .attemptUuid(attempt.getAttemptUuid())
                 .examUuid(attempt.getExamUuid())
                 .examName(exam != null ? exam.getExamName() : null)
+                .studentId(attempt.getStudentId())
+                .studentFullname(attempt.getStudentFullname())
                 .attemptNo(attempt.getAttemptNo())
                 .startedAt(attempt.getStartedAt())
                 .submittedAt(attempt.getSubmittedAt())
                 .timeSpentSeconds(attempt.getTimeSpentSeconds())
                 .status(attempt.getStatus())
-                .score(attempt.getScore())
+                .score(isAttemptScoreVisible(attempt.getStatus()) ? attempt.getScore() : null)
                 .isAutoSubmitted(attempt.getIsAutoSubmitted())
+                .violationCount(nullSafeViolationCount(attempt))
                 .rawImageUrl(attempt.getRawImageUrl())
                 .scoredImageUrl(attempt.getScoredImageUrl())
                 .build();
@@ -407,16 +465,22 @@ public class ExamAttemptService {
             Map<UUID, Question> questionById,
             Map<UUID, List<QuestionMcOption>> optionsByQuestion,
             Map<UUID, List<QuestionTrueFalseStatement>> statementsByQuestion,
-            Map<UUID, List<StudentAnswer>> answerHistoryByQuestion) {
+            Map<UUID, List<StudentAnswer>> answerHistoryByQuestion,
+            Map<UUID, QuestionAnswerKey> answerKeyByQuestion,
+            Exam exam,
+            SubmitSource submitSource,
+            boolean answersReleased) {
         Question question = questionById.get(snapshot.questionUuid());
         List<StudentAnswer> history = answerHistoryByQuestion.getOrDefault(snapshot.questionUuid(), List.of());
         StudentAnswer latestAnswer = history.isEmpty() ? null : history.get(history.size() - 1);
+        QuestionAnswerKey answerKey = answerKeyByQuestion.get(snapshot.questionUuid());
 
         return ResAttemptQuestionDTO.builder()
                 .questionOrder(snapshot.questionOrder())
                 .questionUuid(snapshot.questionUuid())
                 .questionType(snapshot.questionType())
                 .questionContent(question != null ? question.getQuestionContent() : null)
+                .imagePath(question != null ? question.getImagePath() : null)
                 .questionTopic(question != null ? question.getQuestionTopic() : null)
                 .score(snapshot.score())
                 .fromQuestionGroup(snapshot.fromQuestionGroup())
@@ -439,7 +503,16 @@ public class ExamAttemptService {
                 .currentRawAnswer(latestAnswer != null ? latestAnswer.getRawAnswer() : null)
                 .currentNormalizedAnswer(latestAnswer != null ? latestAnswer.getNormalizedAnswer() : null)
                 .answerChangeCount(history.size())
+                .correctAnswerRaw(answersReleased && answerKey != null ? answerKey.getCorrectAnswerRaw() : null)
+                .correctNormalizedAnswer(answersReleased && answerKey != null ? answerKey.getNormalizedAnswer() : null)
+                .earnedScore(answersReleased
+                        ? calculateQuestionScore(exam, submitSource, snapshot, latestAnswer, answerKey)
+                        : null)
                 .build();
+    }
+
+    private boolean isAttemptScoreVisible(AttemptStatus status) {
+        return status == AttemptStatus.SCORED || status == AttemptStatus.ANSWER_RELEASED;
     }
 
     private ExamAttempt finalizeAttempt(ExamAttempt attempt, Exam exam, boolean autoSubmitted) {
@@ -488,7 +561,12 @@ public class ExamAttemptService {
         attempt.setStatus(AttemptStatus.SCORED);
         attempt.setScore(totalScore);
         attempt.setIsAutoSubmitted(autoSubmitted);
+        attempt.setViolationCount((int) examProctoringEventRepository.countByAttemptUuid(attempt.getAttemptUuid()));
         return examAttemptRepository.save(attempt);
+    }
+
+    private Integer nullSafeViolationCount(ExamAttempt attempt) {
+        return attempt.getViolationCount() == null ? 0 : attempt.getViolationCount();
     }
 
     private boolean isAttemptExpired(ExamAttempt attempt, Exam exam, Instant now) {
@@ -748,6 +826,36 @@ public class ExamAttemptService {
                 .orElseThrow(() -> new IdInvalidException("User id is missing from JWT"));
     }
 
+    private String resolveCurrentRoleName() {
+        return SecurityUtil.getCurrentRoleName()
+                .filter(StringUtils::hasText)
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .orElseThrow(() -> new IdInvalidException("Role name is missing from JWT"));
+    }
+
+    private StudentIdentity resolveCurrentStudentIdentity() {
+        UUID studentUuid = resolveCurrentStudentUuid();
+        String roleName = resolveCurrentRoleName();
+        String studentFullname = SecurityUtil.getCurrentUserFullName()
+                .filter(StringUtils::hasText)
+                .orElseThrow(() -> new IdInvalidException("User full name is missing from JWT"));
+
+        if ("STUDENT".equals(roleName)) {
+            String studentId = SecurityUtil.getCurrentStudentId()
+                    .filter(StringUtils::hasText)
+                    .orElseThrow(() -> new IdInvalidException("Student id is missing from JWT"));
+            return new StudentIdentity(studentUuid, studentId, studentFullname);
+        }
+
+        if (NON_STUDENT_ATTEMPT_ROLES.contains(roleName)) {
+            return new StudentIdentity(studentUuid, null, "NOT_STUDENT_" + studentFullname);
+        }
+
+        throw new IdInvalidException("Current role is not allowed to start an exam attempt");
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
     private record AttemptQuestionSnapshot(
             Integer questionOrder,
             UUID questionUuid,
@@ -756,5 +864,8 @@ public class ExamAttemptService {
             Boolean fromQuestionGroup,
             UUID groupUuid,
             String groupName) {
+    }
+
+    private record StudentIdentity(UUID studentUuid, String studentId, String studentFullname) {
     }
 }

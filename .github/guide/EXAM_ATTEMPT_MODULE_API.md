@@ -1,4 +1,4 @@
-# Exam Attempt Module API
+﻿# Exam Attempt Module API
 
 ## 1. Mục đích module
 
@@ -17,6 +17,7 @@ Module này cũng là nơi xử lý các nghiệp vụ quan trọng:
 - lưu lịch sử thay đổi đáp án
 - chấm điểm theo đáp án cuối cùng
 - auto-submit khi hết thời gian
+- kiểm soát dữ liệu review theo trạng thái `SUBMITTED`, `SCORED`, `ANSWER_RELEASED`
 
 ---
 
@@ -32,6 +33,7 @@ Tất cả API thành công của module này đều được bọc bởi `RestR
 - backend xác định học sinh hiện tại từ claim:
   - `user.id`
 - field `studentUuid` trong response là id của user hiện tại được đọc từ `access token`
+- field `studentId` và `studentFullname` được snapshot từ JWT. Với role `STUDENT`, `studentId = user.studentId` và `studentFullname = user.fullName`. Với role `TEACHER`, `TA`, `COLAB_TEACHER`, `MANAGER`, backend cho phép start attempt để test tính năng, `studentId = null`, `studentFullname = "NOT_STUDENT_" + user.fullName`.
 
 ### Format thành công chung
 
@@ -85,6 +87,8 @@ Ví dụ:
   "examUuid": "uuid",
   "examName": "string",
   "studentUuid": "uuid",
+  "studentId": "10013",
+  "studentFullname": "Nguyen Van A",
   "attemptNo": 1,
   "startedAt": "2026-05-17T10:00:00Z",
   "submittedAt": null,
@@ -92,6 +96,7 @@ Ví dụ:
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": "string | null",
   "scoredImageUrl": "string | null",
   "questions": []
@@ -106,6 +111,7 @@ Ví dụ:
   "questionUuid": "uuid",
   "questionType": "MCQ | TFQ | SAQ",
   "questionContent": "string",
+  "imagePath": "string | null",
   "questionTopic": "string | null",
   "score": 1.0,
   "fromQuestionGroup": false,
@@ -115,9 +121,14 @@ Ví dụ:
   "tfStatements": [],
   "currentRawAnswer": "string | null",
   "currentNormalizedAnswer": "string | null",
-  "answerChangeCount": 0
+  "answerChangeCount": 0,
+  "correctAnswerRaw": "chỉ xuất hiện khi status = ANSWER_RELEASED",
+  "correctNormalizedAnswer": "chỉ xuất hiện khi status = ANSWER_RELEASED",
+  "earnedScore": "chỉ xuất hiện khi status = ANSWER_RELEASED"
 }
 ```
+
+`score` trong từng câu là điểm tối đa của câu. `earnedScore` là điểm học sinh thực nhận cho câu đó.
 
 ### 3.4. Response summary của danh sách attempt
 
@@ -133,6 +144,7 @@ Ví dụ:
   "status": "IN_PROGRESS | SUBMITTED | SCORED | ANSWER_RELEASED | CANCELLED",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": "string | null",
   "scoredImageUrl": "string | null"
 }
@@ -171,6 +183,8 @@ Ví dụ:
 - nếu `endTime` có giá trị, không được start sau thời điểm đó
 - phải tôn trọng `numberOfAttempt`
 - `studentUuid` được lấy từ claim `user.id` trong `access token`
+- nếu role là `STUDENT`, `studentId` được lấy từ claim `user.studentId` và `studentFullname` lấy từ `user.fullName`
+- nếu role là `TEACHER`, `TA`, `COLAB_TEACHER`, `MANAGER`, `studentId = null`, `studentFullname = "NOT_STUDENT_" + user.fullName`
 
 ### 4.2. Rule random câu hỏi theo group
 
@@ -231,6 +245,21 @@ Nếu `exam.endTime` là `null`, hệ thống dùng:
   - `12` -> `12__`
   - `|23|,|7` -> `_M,7`
 
+### 4.6. Rule xem lại bài làm và công bố đáp án
+
+Response attempt được giới hạn theo trạng thái:
+
+| Trạng thái | Xem bài làm | Xem tổng điểm | Xem đáp án đúng | Xem điểm đạt từng câu |
+|---|---:|---:|---:|---:|
+| `SUBMITTED` | Có | Không | Không | Không |
+| `SCORED` | Có | Có | Không | Không |
+| `ANSWER_RELEASED` | Có | Có | Có | Có |
+
+- khi gọi `GET /api/v1/student/attempts/{attemptUuid}`, nếu `Exam.endTime < Instant.now()` và attempt đang là `SUBMITTED` hoặc `SCORED`, backend chuyển và lưu trạng thái thành `ANSWER_RELEASED`
+- attempt `CANCELLED` không tự chuyển sang `ANSWER_RELEASED`
+- các field `correctAnswerRaw`, `correctNormalizedAnswer`, `earnedScore` không xuất hiện trong JSON trước khi đáp án được công bố
+- `score` ở cấp attempt là `null` khi trạng thái là `SUBMITTED`
+
 ---
 
 ## 5. API chi tiết
@@ -243,7 +272,7 @@ Nếu `exam.endTime` là `null`, hệ thống dùng:
 
 ### Mô tả luồng
 
-Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` trong `access token` -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
+Người dùng được phép bắt đầu làm bài -> lấy `studentUuid`, `studentId`, `studentFullname` từ JWT theo role -> kiểm tra đề có tồn tại và đang ở trạng thái `PUBLISHED` không -> kiểm tra thời gian mở/đóng đề -> kiểm tra số lần làm tối đa -> random câu hỏi từ các group nếu có -> snapshot bộ câu hỏi vào attempt -> lưu `ExamAttempt` -> trả dữ liệu chi tiết attempt cho frontend
 
 ### Input format
 
@@ -261,6 +290,8 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": null,
@@ -268,6 +299,7 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": [
@@ -297,6 +329,10 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
 #### `400 Bad Request`
 
 - `User id is missing from JWT`
+- `Role name is missing from JWT`
+- `User full name is missing from JWT`
+- `Student id is missing from JWT`
+- `Current role is not allowed to start an exam attempt`
 - `Exam not found with id: {examUuid}`
 - `Exam is not available for attempt`
 - `Exam has not started yet`
@@ -322,7 +358,7 @@ Học sinh bắt đầu làm bài -> lấy `studentUuid` từ claim `user.id` tr
 
 ### Mô tả luồng
 
-Nhận `attemptUuid` -> lấy attempt theo id -> kiểm tra quyền sở hữu -> nếu attempt đã hết thời gian thì auto-submit trước -> đọc snapshot câu hỏi -> lấy options, statements, answer history -> build response chi tiết -> trả kết quả
+Nhận `attemptUuid` -> lấy attempt theo id -> kiểm tra quyền sở hữu -> nếu attempt đang làm đã hết thời gian thì auto-submit trước -> nếu `Exam.endTime < Instant.now()` và attempt đã hoàn tất thì chuyển sang `ANSWER_RELEASED` -> đọc snapshot câu hỏi -> lấy options, statements, answer history -> chỉ lấy answer key và tính điểm từng câu khi đáp án đã được công bố -> build response chi tiết -> trả kết quả
 
 ### Input format
 
@@ -341,6 +377,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": null,
@@ -348,6 +386,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "IN_PROGRESS",
     "score": null,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": [
@@ -356,6 +395,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
         "questionUuid": "uuid",
         "questionType": "SAQ",
         "questionContent": "Điền kết quả vào ô trả lời",
+        "imagePath": null,
         "questionTopic": "Số học",
         "score": 1.0,
         "fromQuestionGroup": true,
@@ -371,6 +411,18 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
   }
 }
 ```
+
+Khi response có `status = ANSWER_RELEASED`, từng câu trả thêm:
+
+```json
+{
+  "correctAnswerRaw": "A",
+  "correctNormalizedAnswer": "A",
+  "earnedScore": 1.0
+}
+```
+
+Khi trạng thái chưa phải `ANSWER_RELEASED`, ba field trên không xuất hiện trong JSON.
 
 ### Exception có thể trả về
 
@@ -401,6 +453,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
 
 Nhận các tham số filter -> lấy `studentUuid` từ claim `user.id` trong `access token` -> query danh sách attempt của học sinh -> nếu có `examUuid` thì lọc theo đề -> auto-submit mềm các attempt đã quá hạn trước khi build summary -> trả kết quả phân trang
 
+API danh sách không tự chuyển attempt sang `ANSWER_RELEASED`. Frontend gọi API chi tiết attempt để backend kiểm tra `Exam.endTime` và công bố đáp án. Trong summary, `score` là `null` khi attempt chưa ở trạng thái `SCORED` hoặc `ANSWER_RELEASED`.
+
 ### Input format
 
 - `examUuid`: `UUID`, không bắt buộc
@@ -430,6 +484,7 @@ Ví dụ item summary:
   "status": "IN_PROGRESS",
   "score": null,
   "isAutoSubmitted": false,
+  "violationCount": 0,
   "rawImageUrl": null,
   "scoredImageUrl": null
 }
@@ -440,6 +495,10 @@ Ví dụ item summary:
 #### `400 Bad Request`
 
 - `User id is missing from JWT`
+- `Role name is missing from JWT`
+- `User full name is missing from JWT`
+- `Student id is missing from JWT`
+- `Current role is not allowed to start an exam attempt`
 - `Exam not found with id: {examUuid}`
 
 #### `403 Forbidden`
@@ -525,7 +584,7 @@ Trả `ResExamAttemptDTO` giống API lấy chi tiết attempt.
 
 ### Mô tả luồng
 
-Nhận `attemptUuid` -> kiểm tra quyền sở hữu -> kiểm tra attempt còn `IN_PROGRESS` không -> lấy toàn bộ snapshot câu hỏi -> lấy answer history của từng câu -> tạo `final answer` cho từng câu -> lấy `QuestionAnswerKey` -> chấm điểm theo từng loại câu hỏi -> cập nhật `submittedAt`, `timeSpentSeconds`, `status`, `score`, `isAutoSubmitted` -> trả kết quả
+Nhận `attemptUuid` -> kiểm tra quyền sở hữu -> kiểm tra attempt còn `IN_PROGRESS` không -> lấy toàn bộ snapshot câu hỏi -> lấy answer history của từng câu -> tạo `final answer` cho từng câu -> lấy `QuestionAnswerKey` -> chấm điểm theo từng loại câu hỏi -> đếm số sự kiện giám sát của attempt -> cập nhật `submittedAt`, `timeSpentSeconds`, `status`, `score`, `isAutoSubmitted`, `violationCount` -> trả kết quả
 
 ### Input format
 
@@ -545,6 +604,8 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "examUuid": "uuid",
     "examName": "Đề kiểm tra Toán 15 phút",
     "studentUuid": "uuid",
+    "studentId": "10013",
+    "studentFullname": "Nguyen Van A",
     "attemptNo": 1,
     "startedAt": "2026-05-17T10:00:00Z",
     "submittedAt": "2026-05-17T10:14:58Z",
@@ -552,6 +613,7 @@ Trả `ResExamAttemptDTO`, ví dụ rút gọn:
     "status": "SCORED",
     "score": 8.5,
     "isAutoSubmitted": false,
+    "violationCount": 0,
     "rawImageUrl": null,
     "scoredImageUrl": null,
     "questions": []
@@ -823,6 +885,16 @@ Frontend có thể đọc lại:
 
 để debug dữ liệu OMR hoặc khôi phục trạng thái màn hình.
 
+### 7.6. Hiển thị màn hình xem lại bài
+
+Frontend nên render theo `status`:
+
+- `SUBMITTED`: hiển thị câu hỏi và bài làm, không hiển thị tổng điểm
+- `SCORED`: hiển thị câu hỏi, bài làm và tổng điểm
+- `ANSWER_RELEASED`: hiển thị thêm đáp án đúng và `earnedScore` của từng câu
+
+Không nên suy luận đáp án đã được công bố chỉ từ việc exam đã hết giờ; frontend dùng chính `status` trong response.
+
 ---
 
 ## 8. Gợi ý kiểm thử frontend
@@ -858,7 +930,7 @@ Frontend có thể đọc lại:
 
 - lấy toàn bộ attempt của học sinh
 - filter theo `examUuid`
-- kiểm tra `status`, `score`, `submittedAt`, `isAutoSubmitted`
+- kiểm tra `status`, `score`, `submittedAt`, `isAutoSubmitted`, `violationCount`
 
 ### 8.6. Ghi nhận giám sát/gian lận
 
@@ -870,3 +942,12 @@ Frontend có thể đọc lại:
 - gửi batch rỗng
 - gửi quá 100 event
 - gửi event cho attempt không thuộc học sinh hiện tại
+
+### 8.7. Xem lại bài và công bố đáp án
+
+- `SUBMITTED`: có bài làm nhưng `score = null`, không có answer key hoặc `earnedScore`
+- `SCORED`: có tổng điểm nhưng không có answer key hoặc `earnedScore`
+- `SCORED` sau `Exam.endTime`: gọi GET và kiểm tra status chuyển thành `ANSWER_RELEASED`
+- `ANSWER_RELEASED`: có `correctAnswerRaw`, `correctNormalizedAnswer`, `earnedScore`
+- `CANCELLED` sau `Exam.endTime`: không tự chuyển thành `ANSWER_RELEASED`
+

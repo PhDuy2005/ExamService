@@ -17,6 +17,8 @@ public class ResExamAttemptSummaryDTO {
     private UUID attemptUuid;
     private UUID examUuid;
     private String examName;
+    private String studentId;
+    private String studentFullname;
     private Integer attemptNo;
     private Instant startedAt;
     private Instant submittedAt;
@@ -24,6 +26,7 @@ public class ResExamAttemptSummaryDTO {
     private AttemptStatus status;
     private BigDecimal score;
     private Boolean isAutoSubmitted;
+    private Integer violationCount;
     private String rawImageUrl;
     private String scoredImageUrl;
 }

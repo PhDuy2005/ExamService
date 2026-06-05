@@ -130,13 +130,14 @@ public class ExamService {
     }
 
     private Exam findExamById(UUID examUuid) {
-        return examRepository.findById(examUuid)
+        return examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
     }
 
     private void applyExamData(Exam exam, ReqCreateExamDTO request) {
         exam.setExamName(request.getExamName().trim());
         exam.setGradeId(request.getGradeId());
+        exam.setSchoolYear(request.getSchoolYear() != null ? request.getSchoolYear().trim() : null);
         exam.setExamType(request.getExamType());
         exam.setStartTime(request.getStartTime());
         exam.setEndTime(request.getEndTime());
@@ -227,6 +228,8 @@ public class ExamService {
                 }
             }
         }
+
+        validateDuplicateQuestions(examQuestions, resolvedGroups, questionById);
 
         return new ValidationContext(questionById, resolvedGroups);
     }
@@ -431,6 +434,7 @@ public class ExamService {
                 .examUuid(exam.getExamUuid())
                 .examName(exam.getExamName())
                 .gradeId(exam.getGradeId())
+                .schoolYear(exam.getSchoolYear())
                 .examType(exam.getExamType())
                 .startTime(exam.getStartTime())
                 .endTime(exam.getEndTime())
@@ -459,6 +463,7 @@ public class ExamService {
         return ResExamQuestionDetailDTO.builder()
                 .questionUuid(question.getQuestionUuid())
                 .questionContent(question.getQuestionContent())
+                .imagePath(question.getImagePath())
                 .questionTopic(question.getQuestionTopic())
                 .questionType(question.getQuestionType())
                 .build();
@@ -491,6 +496,53 @@ public class ExamService {
 
     private String normalizeTopic(String topic) {
         return StringUtils.hasText(topic) ? topic.trim() : null;
+    }
+
+    private void validateDuplicateQuestions(
+            List<ReqExamQuestionDTO> examQuestions,
+            List<ResolvedExamQuestionGroupPayload> resolvedGroups,
+            Map<UUID, Question> questionById) {
+        Map<UUID, List<String>> occurrencesByQuestionId = new LinkedHashMap<>();
+
+        for (ReqExamQuestionDTO examQuestion : examQuestions) {
+            occurrencesByQuestionId.computeIfAbsent(examQuestion.getQuestionUuid(), ignored -> new ArrayList<>())
+                    .add("cau " + examQuestion.getQuestionOrder() + " - cau hoi le");
+        }
+
+        for (ResolvedExamQuestionGroupPayload group : resolvedGroups) {
+            List<QuestionGroupItem> items = group.items();
+            for (int index = 0; index < items.size(); index++) {
+                QuestionGroupItem item = items.get(index);
+                occurrencesByQuestionId.computeIfAbsent(item.getQuestionUuid(), ignored -> new ArrayList<>())
+                        .add("cau " + (index + 1) + " - Nhom " + group.questionGroup().getGroupName());
+            }
+        }
+
+        UUID duplicateQuestionId = occurrencesByQuestionId.entrySet().stream()
+                .filter(entry -> entry.getValue().size() > 1)
+                .map(Map.Entry::getKey)
+                .findFirst()
+                .orElse(null);
+        if (duplicateQuestionId == null) {
+            return;
+        }
+
+        Question question = questionById.get(duplicateQuestionId);
+        String questionLabel = buildDuplicateQuestionLabel(question, duplicateQuestionId);
+        String occurrences = String.join(", ", occurrencesByQuestionId.get(duplicateQuestionId));
+        throw new IdInvalidException("Cau hoi " + questionLabel
+                + " chi duoc xuat hien 1 lan trong de. Hien tai dang xuat hien tai: " + occurrences);
+    }
+
+    private String buildDuplicateQuestionLabel(Question question, UUID questionUuid) {
+        if (question == null || !StringUtils.hasText(question.getQuestionContent())) {
+            return questionUuid.toString();
+        }
+
+        String normalizedContent = question.getQuestionContent().trim().replaceAll("\\s+", " ");
+        return normalizedContent.length() > 80
+                ? normalizedContent.substring(0, 77) + "..."
+                : normalizedContent;
     }
 
     private record ValidationContext(

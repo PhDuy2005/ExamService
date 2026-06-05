@@ -14,6 +14,7 @@ import lombok.Setter;
 public class ResExamQuestionDetailDTO {
     private UUID questionUuid;
     private String questionContent;
+    private String imagePath;
     private String questionTopic;
     private QuestionType questionType;
 }

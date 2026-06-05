@@ -44,6 +44,7 @@ Theo yêu cầu hiện tại:
 
 - Mục đích:
   - tạo nhóm câu hỏi dùng lại được
+  - thêm, xóa hoặc thay đổi câu hỏi trong nhóm
   - xem chi tiết nhóm câu hỏi
   - tìm kiếm danh sách nhóm câu hỏi
 - File guide chi tiết:
@@ -67,6 +68,7 @@ Theo yêu cầu hiện tại:
   - học sinh bắt đầu làm bài
   - lưu đáp án trong quá trình làm
   - xem chi tiết attempt
+  - xem lại bài, tổng điểm, đáp án đúng và điểm từng câu theo trạng thái công bố
   - nộp bài
   - xem danh sách các lần làm bài
 - File guide chi tiết:
@@ -96,7 +98,18 @@ Theo yêu cầu hiện tại:
 - Trạng thái:
   - đã có API
 
-### 2.8. Scoring Rules
+### 2.8. PDF Module
+
+- Mục đích:
+  - tự động sinh file PDF khi tạo mã đề
+  - render nội dung câu hỏi, LaTeX và ảnh
+  - cung cấp file PDF cho frontend tải hoặc mở
+- File guide chi tiết:
+  - [.github/guide/PDF_MODULE_API.md](D:/DoAn/DoAn1/ExamService/ExamService/.github/guide/PDF_MODULE_API.md)
+- Trạng thái:
+  - đã có API/static-resource endpoint
+
+### 2.9. Scoring Rules
 
 - Mục đích:
   - mô tả riêng nghiệp vụ chấm điểm
@@ -119,7 +132,8 @@ Nếu viết tiếp theo mức độ ưu tiên cho frontend, mình đề xuất:
 5. `Exam Assignment Module`
 6. `System / Health Module`
 7. `OMR Module`
-8. `Scoring Rules`
+8. `PDF Module`
+9. `Scoring Rules`
 
 ---
 

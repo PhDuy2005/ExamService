@@ -19,6 +19,8 @@ public class ResExamAttemptDTO {
     private UUID examUuid;
     private String examName;
     private UUID studentUuid;
+    private String studentId;
+    private String studentFullname;
     private Integer attemptNo;
     private Instant startedAt;
     private Instant submittedAt;
@@ -26,6 +28,7 @@ public class ResExamAttemptDTO {
     private AttemptStatus status;
     private BigDecimal score;
     private Boolean isAutoSubmitted;
+    private Integer violationCount;
     private String rawImageUrl;
     private String scoredImageUrl;
     private List<ResAttemptQuestionDTO> questions;

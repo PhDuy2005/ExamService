@@ -359,9 +359,39 @@ nên:
 
 ---
 
-## 9. Những gì backend hiện chưa làm trong scoring
+## 9. Công bố đáp án và điểm từng câu
 
-### 9.1. `SAQ` chưa có fuzzy matching
+Khi học sinh gọi:
+
+- `GET /api/v1/student/attempts/{attemptUuid}`
+
+backend kiểm tra `Exam.endTime`:
+
+- nếu `Exam.endTime < Instant.now()` và attempt đang là `SUBMITTED` hoặc `SCORED`, backend chuyển trạng thái thành `ANSWER_RELEASED`
+- nếu attempt đã là `ANSWER_RELEASED`, backend giữ nguyên trạng thái
+- attempt `CANCELLED` không tự chuyển sang `ANSWER_RELEASED`
+
+Quyền xem kết quả theo trạng thái:
+
+| Trạng thái | Tổng điểm | Đáp án đúng | Điểm đạt từng câu |
+|---|---:|---:|---:|
+| `SUBMITTED` | Ẩn | Ẩn | Ẩn |
+| `SCORED` | Hiện | Ẩn | Ẩn |
+| `ANSWER_RELEASED` | Hiện | Hiện | Hiện |
+
+Khi `ANSWER_RELEASED`, từng câu trong response trả thêm:
+
+- `correctAnswerRaw`
+- `correctNormalizedAnswer`
+- `earnedScore`
+
+`earnedScore` được tính lại bằng cùng rule chấm điểm đã dùng khi finalize attempt.
+
+---
+
+## 10. Những gì backend hiện chưa làm trong scoring
+
+### 10.1. `SAQ` chưa có fuzzy matching
 
 Backend hiện chưa hỗ trợ:
 
@@ -371,29 +401,29 @@ Backend hiện chưa hỗ trợ:
 - so khớp biểu thức toán học tương đương
 - làm tròn số nâng cao
 
-### 9.2. Chưa có partial score cho `MCQ`
+### 10.2. Chưa có partial score cho `MCQ`
 
 `MCQ` hiện là:
 
 - đúng thì trọn điểm
 - sai thì `0`
 
-### 9.3. `SAQ` đang chấm theo exact match
+### 10.3. `SAQ` đang chấm theo exact match
 
 Điều này rất rõ ràng và dễ kiểm thử, nhưng cũng chặt hơn một số nghiệp vụ thực tế.
 
 ---
 
-## 10. Gợi ý kiểm thử QA
+## 11. Gợi ý kiểm thử QA
 
-### 10.1. `MCQ`
+### 11.1. `MCQ`
 
 - `WEB` với 1 đáp án đúng
 - `WEB` với nhiều đáp án đúng
 - `OMR_IMPORT` với tô nhiều đáp án, ví dụ `AD`
 - `OMR_IMPORT` với đáp án đúng 1 ký tự
 
-### 10.2. `TFQ`
+### 11.2. `TFQ`
 
 - đúng `0` ý
 - đúng `1` ý
@@ -403,7 +433,7 @@ Backend hiện chưa hỗ trợ:
 - case có `N`
 - case có `B`
 
-### 10.3. `SAQ`
+### 11.3. `SAQ`
 
 - 1 đáp án đúng
 - nhiều đáp án đúng phân cách bằng `;`
@@ -411,9 +441,16 @@ Backend hiện chưa hỗ trợ:
 - đáp án OMR có `_`
 - đáp án OMR có `M`
 
-### 10.4. Auto-submit
+### 11.4. Auto-submit
 
 - để quá thời gian rồi submit tự động
 - kiểm tra `score`
 - kiểm tra `isAutoSubmitted = true`
 - kiểm tra `status = SCORED`
+
+### 11.5. Công bố đáp án
+
+- `SUBMITTED`: không trả tổng điểm, đáp án đúng hoặc điểm từng câu
+- `SCORED`: trả tổng điểm nhưng chưa trả đáp án đúng hoặc điểm từng câu
+- gọi GET chi tiết attempt sau `Exam.endTime` và kiểm tra trạng thái chuyển thành `ANSWER_RELEASED`
+- `ANSWER_RELEASED`: trả đáp án đúng và `earnedScore` của từng câu

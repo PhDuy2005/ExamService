@@ -36,6 +36,9 @@ public class Question extends AuditableEntity {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String questionContent;
 
+    @Column(length = 1000)
+    private String imagePath;
+
     @Column(length = 255)
     private String questionTopic;
 

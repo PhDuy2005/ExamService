@@ -25,6 +25,9 @@ public class ReqCreateExamDTO {
     @NotNull(message = "Grade id is required")
     private Long gradeId;
 
+    @NotBlank(message = "School year must not be blank")
+    private String schoolYear;
+
     @NotNull(message = "Exam type is required")
     private ExamType examType;
 

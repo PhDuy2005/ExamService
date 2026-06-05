@@ -46,6 +46,9 @@ public class ExamPaper extends AuditableEntity {
     @Column(nullable = false)
     private UUID generatedByUserUuid;
 
+    @Column(length = 1000)
+    private String pdfUrl;
+
     @PrePersist
     void prePersist() {
         if (paperUuid == null) {

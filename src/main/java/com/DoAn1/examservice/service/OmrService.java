@@ -1,6 +1,9 @@
 package com.DoAn1.examservice.service;
 
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -21,6 +24,7 @@ import com.DoAn1.examservice.domain.entity.ExamQuestion;
 import com.DoAn1.examservice.domain.entity.ExamQuestionGroup;
 import com.DoAn1.examservice.domain.entity.ExamQuestionGroupItem;
 import com.DoAn1.examservice.domain.entity.OmrImport;
+import com.DoAn1.examservice.domain.entity.Question;
 import com.DoAn1.examservice.domain.enums.QuestionType;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqCreateExamPaperDTO;
 import com.DoAn1.examservice.domain.requestDTO.omr.ReqOmrAnswerDTO;
@@ -31,13 +35,16 @@ import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResExamPaperQuestionDTO;
 import com.DoAn1.examservice.domain.responseDTO.omr.ResOmrImportDTO;
 import com.DoAn1.examservice.exception.IdInvalidException;
+import com.DoAn1.examservice.exception.StorageException;
 import com.DoAn1.examservice.repository.ExamPaperRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupItemRepository;
 import com.DoAn1.examservice.repository.ExamQuestionGroupRepository;
 import com.DoAn1.examservice.repository.ExamQuestionRepository;
 import com.DoAn1.examservice.repository.ExamRepository;
 import com.DoAn1.examservice.repository.OmrImportRepository;
+import com.DoAn1.examservice.repository.QuestionRepository;
 import com.DoAn1.examservice.util.SecurityUtil;
+import com.DoAn1.examservice.util.UuidV7Generator;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -54,7 +61,10 @@ public class OmrService {
     private final ExamQuestionGroupItemRepository examQuestionGroupItemRepository;
     private final ExamPaperRepository examPaperRepository;
     private final OmrImportRepository omrImportRepository;
+    private final QuestionRepository questionRepository;
     private final ExamAttemptService examAttemptService;
+    private final ExamPaperPdfService examPaperPdfService;
+    private final FileService fileService;
     private final ObjectMapper objectMapper;
 
     @Transactional
@@ -71,12 +81,43 @@ public class OmrService {
         }
 
         ExamPaper examPaper = new ExamPaper();
+        examPaper.setPaperUuid(UuidV7Generator.generate());
         examPaper.setExamUuid(exam.getExamUuid());
         examPaper.setPaperCode(paperCode);
         examPaper.setQuestionSnapshotJson(serializeSnapshots(snapshots));
         examPaper.setGeneratedByUserUuid(resolveCurrentUserUuid());
+        examPaper.setGeneratedAt(Instant.now());
+        examPaper.setPdfUrl(examPaperPdfService.generateAndStore(exam, examPaper));
 
         return buildPaperResponse(examPaperRepository.save(examPaper), snapshots);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ResExamPaperDTO> getExamPapersByExamUuid(UUID examUuid) {
+        findExamById(examUuid);
+        return examPaperRepository.findByExamUuidOrderByPaperCodeAsc(examUuid)
+                .stream()
+                .map(paper -> buildPaperResponse(paper, deserializeSnapshots(paper.getQuestionSnapshotJson())))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public ExamPaperPdfFile getExamPaperPdfFile(UUID examUuid, String paperCode) {
+        findExamById(examUuid);
+        String normalizedPaperCode = normalizePaperCode(paperCode);
+        ExamPaper paper = examPaperRepository.findByExamUuidAndPaperCode(examUuid, normalizedPaperCode)
+                .orElseThrow(() -> new IdInvalidException("Exam paper not found with code: " + normalizedPaperCode));
+
+        if (!StringUtils.hasText(paper.getPdfUrl())) {
+            throw new StorageException("Exam paper PDF is not available");
+        }
+
+        Path pdfPath = fileService.resolveStorageUrl(paper.getPdfUrl());
+        if (!Files.isRegularFile(pdfPath)) {
+            throw new StorageException("Exam paper PDF file not found");
+        }
+
+        return new ExamPaperPdfFile(paper.getPaperCode(), pdfPath);
     }
 
     @Transactional
@@ -95,6 +136,8 @@ public class OmrService {
         ResExamAttemptDTO attempt = examAttemptService.importOmrAttempt(
                 request.getExamUuid(),
                 request.getStudentUuid(),
+                request.getStudentId(),
+                request.getStudentFullname(),
                 paper.getQuestionSnapshotJson(),
                 rawAnswerByQuestionOrder,
                 request.getRawImageUrl(),
@@ -116,7 +159,7 @@ public class OmrService {
     }
 
     private Exam findExamById(UUID examUuid) {
-        return examRepository.findById(examUuid)
+        return examRepository.findByExamUuid(examUuid)
                 .orElseThrow(() -> new IdInvalidException("Exam not found with id: " + examUuid));
     }
 
@@ -208,12 +251,18 @@ public class OmrService {
     }
 
     private ResExamPaperDTO buildPaperResponse(ExamPaper paper, List<PaperQuestionSnapshot> snapshots) {
+        Map<UUID, Question> questionById = questionRepository.findAllById(
+                snapshots.stream().map(PaperQuestionSnapshot::questionUuid).collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Question::getQuestionUuid, question -> question));
+
         return ResExamPaperDTO.builder()
                 .paperUuid(paper.getPaperUuid())
                 .examUuid(paper.getExamUuid())
                 .paperCode(paper.getPaperCode())
                 .generatedAt(paper.getGeneratedAt())
                 .generatedByUserUuid(paper.getGeneratedByUserUuid())
+                .pdfUrl(paper.getPdfUrl())
                 .questions(snapshots.stream()
                         .sorted(Comparator.comparing(PaperQuestionSnapshot::questionOrder))
                         .map(snapshot -> ResExamPaperQuestionDTO.builder()
@@ -221,6 +270,9 @@ public class OmrService {
                                 .sectionQuestionNumber(snapshot.sectionQuestionNumber())
                                 .questionUuid(snapshot.questionUuid())
                                 .questionType(snapshot.questionType())
+                                .imagePath(questionById.get(snapshot.questionUuid()) != null
+                                        ? questionById.get(snapshot.questionUuid()).getImagePath()
+                                        : null)
                                 .score(snapshot.score())
                                 .fromQuestionGroup(snapshot.fromQuestionGroup())
                                 .groupUuid(snapshot.groupUuid())
@@ -282,6 +334,9 @@ public class OmrService {
 
     private String normalizeExternalSubmissionId(String externalSubmissionId) {
         return StringUtils.hasText(externalSubmissionId) ? externalSubmissionId.trim() : null;
+    }
+
+    public record ExamPaperPdfFile(String paperCode, Path path) {
     }
 
     private record PaperQuestionSnapshot(

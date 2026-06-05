@@ -247,6 +247,7 @@ Lưu thông tin đề kiểm tra / bài tập.
 | `exam_uuid`            | UUID                 |       Có | Khóa chính của đề                      |
 | `exam_name`            | VARCHAR              |       Có | Tên đề kiểm tra / bài tập              |
 | `grade_id`             | BIGINT / LONG        |       Có | Khối/lớp mà đề áp dụng                 |
+| `school_year`          | VARCHAR(20)          |       Có | Năm học của đề, dùng để resolve học sinh từ `student_code` khi import OMR |
 | `exam_type`            | VARCHAR(20)          |       Có | Loại đề                                |
 | `start_time`           | DATETIME / TIMESTAMP |    Không | Thời điểm bắt đầu cho phép làm bài     |
 | `end_time`             | DATETIME / TIMESTAMP |    Không | Thời điểm kết thúc cho phép làm bài    |
@@ -423,6 +424,8 @@ Lưu thông tin một lần làm bài của học sinh.
 | `attempt_uuid`       | UUID                 |       Có | Khóa chính của lần làm bài                    |
 | `exam_uuid`          | UUID                 |       Có | Tham chiếu đến `EXAM.exam_uuid`               |
 | `student_uuid`       | UUID                 |       Có | Học sinh thực hiện lần làm bài                |
+| `student_id`         | VARCHAR(20)          |    Không | SID/studentId snapshot tại thời điểm tạo attempt |
+| `student_fullname`   | VARCHAR(255)         |    Không | Tên học sinh snapshot tại thời điểm tạo attempt |
 | `attempt_no`         | INT                  |       Có | Số thứ tự lần làm bài của học sinh đối với đề |
 | `started_at`         | DATETIME / TIMESTAMP |    Không | Thời điểm bắt đầu làm bài                     |
 | `submitted_at`       | DATETIME / TIMESTAMP |    Không | Thời điểm nộp bài                             |
@@ -430,6 +433,7 @@ Lưu thông tin một lần làm bài của học sinh.
 | `status`             | VARCHAR              |       Có | Trạng thái lần làm bài                        |
 | `score`              | DECIMAL / NUMERIC    |    Không | Điểm đạt được                                 |
 | `is_auto_submitted`  | BOOLEAN              |       Có | Có phải hệ thống tự nộp bài hay không         |
+| `violation_count`    | INT                  |    Không | Số sự kiện giám sát được snapshot khi attempt hoàn thành |
 | `submit_source`      | VARCHAR(20)          |       Có | Nguồn nộp bài                                 |
 | `created_at`         | DATETIME / TIMESTAMP |       Có | Thời điểm tạo attempt                         |
 
