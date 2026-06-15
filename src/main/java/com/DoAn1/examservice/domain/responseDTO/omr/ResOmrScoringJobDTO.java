@@ -20,7 +20,9 @@ public class ResOmrScoringJobDTO {
     private OmrScoringJobStatus status;
     private Integer pageCount;
     private String rawImageUrl;
+    private String rawImageRelativePath;
     private String scoredImageUrl;
+    private String scoredImageRelativePath;
     private Long resultCount;
     private Long completedCount;
     private Long failedCount;

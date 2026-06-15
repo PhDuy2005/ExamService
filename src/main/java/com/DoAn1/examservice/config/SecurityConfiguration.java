@@ -80,6 +80,7 @@ public class SecurityConfiguration {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/storage/download", "/storage/download/path").permitAll()
                         .requestMatchers(
                                 "/",
                                 "/api/v1/health",

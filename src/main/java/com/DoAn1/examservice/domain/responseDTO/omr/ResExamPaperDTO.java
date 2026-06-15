@@ -18,5 +18,6 @@ public class ResExamPaperDTO {
     private Instant generatedAt;
     private UUID generatedByUserUuid;
     private String pdfUrl;
+    private String relativePath;
     private List<ResExamPaperQuestionDTO> questions;
 }

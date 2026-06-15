@@ -18,6 +18,7 @@ public class ResQuestionDTO {
     private Long gradeId;
     private String questionContent;
     private String imagePath;
+    private String relativePath;
     private String questionTopic;
     private QuestionType questionType;
     private UUID createdByUserUuid;

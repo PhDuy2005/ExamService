@@ -46,8 +46,10 @@ class FormatRestResponseTest {
 
         assertThat(result).isInstanceOf(RestResponse.class);
         assertThat(body.getPdfUrl()).isEqualTo(storagePath("omr/papers/paper-a.pdf"));
+        assertThat(body.getRelativePath()).isEqualTo("omr/papers/paper-a.pdf");
         assertThat(body.getQuestions().get(0).getImagePath())
                 .isEqualTo(storagePath("questions/question-1.png"));
+        assertThat(body.getQuestions().get(0).getRelativePath()).isEqualTo("questions/question-1.png");
     }
 
     private MethodParameter returnType() throws NoSuchMethodException {

@@ -58,6 +58,7 @@ public class FileController {
 
         fileService.createUploadFolder(folder);
         String uploadedFile = fileService.store(file, folder);
-        return ResponseEntity.ok(new UploadFileResDTO(uploadedFile, java.time.Instant.now()));
+        String relativePath = fileService.buildStorageRelativePath(folder, uploadedFile);
+        return ResponseEntity.ok(new UploadFileResDTO(uploadedFile, relativePath, java.time.Instant.now()));
     }
 }

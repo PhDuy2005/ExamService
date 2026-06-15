@@ -11,5 +11,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UploadFileResDTO {
     private String fileName;
+    private String relativePath;
     private Instant uploadedAt;
 }

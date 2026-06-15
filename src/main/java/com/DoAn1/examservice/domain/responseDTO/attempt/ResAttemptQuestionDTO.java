@@ -20,6 +20,7 @@ public class ResAttemptQuestionDTO {
     private QuestionType questionType;
     private String questionContent;
     private String imagePath;
+    private String relativePath;
     private String questionTopic;
     private BigDecimal score;
     private Boolean fromQuestionGroup;

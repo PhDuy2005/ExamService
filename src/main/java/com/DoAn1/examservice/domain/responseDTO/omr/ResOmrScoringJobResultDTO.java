@@ -24,6 +24,8 @@ public class ResOmrScoringJobResultDTO {
     private OmrScoringJobResultStatus status;
     private BigDecimal score;
     private String rawImageUrl;
+    private String rawImageRelativePath;
     private String scoredImageUrl;
+    private String scoredImageRelativePath;
     private String errorMessage;
 }

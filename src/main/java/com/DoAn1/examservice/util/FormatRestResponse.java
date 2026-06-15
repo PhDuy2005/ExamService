@@ -168,6 +168,7 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
             field.setAccessible(true);
             Object fieldValue = field.get(target);
             if (fieldValue instanceof String stringValue) {
+                setRelativePathField(target, field, extractSafeStorageRelativePath(stringValue));
                 field.set(target, toAbsoluteStoragePath(stringValue));
             } else {
                 normalizeStoragePaths(fieldValue, visited);
@@ -177,6 +178,64 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
         } finally {
             field.setAccessible(accessible);
         }
+    }
+
+    private void setRelativePathField(Object target, Field sourceField, String relativePath) throws IllegalAccessException {
+        if (relativePath == null) {
+            return;
+        }
+
+        String relativeFieldName = toRelativePathFieldName(sourceField.getName());
+        if (relativeFieldName == null) {
+            return;
+        }
+
+        if (setRelativePathField(target, relativeFieldName, relativePath)) {
+            return;
+        }
+        setRelativePathField(target, "relativePath", relativePath);
+    }
+
+    private boolean setRelativePathField(Object target, String relativeFieldName, String relativePath) throws IllegalAccessException {
+        Field relativeField = findField(target.getClass(), relativeFieldName);
+        if (relativeField == null || relativeField.getType() != String.class
+                || Modifier.isStatic(relativeField.getModifiers())) {
+            return false;
+        }
+
+        boolean accessible = relativeField.canAccess(target);
+        try {
+            relativeField.setAccessible(true);
+            relativeField.set(target, relativePath);
+            return true;
+        } finally {
+            relativeField.setAccessible(accessible);
+        }
+    }
+
+    private String toRelativePathFieldName(String fieldName) {
+        if (fieldName == null || fieldName.endsWith("RelativePath")) {
+            return null;
+        }
+        if (fieldName.endsWith("Url")) {
+            return fieldName.substring(0, fieldName.length() - "Url".length()) + "RelativePath";
+        }
+        if (fieldName.endsWith("Path")) {
+            return fieldName.substring(0, fieldName.length() - "Path".length()) + "RelativePath";
+        }
+        return null;
+    }
+
+    private Field findField(Class<?> valueClass, String fieldName) {
+        Class<?> currentClass = valueClass;
+        while (currentClass != null && currentClass != Object.class) {
+            try {
+                return currentClass.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException ignored) {
+                currentClass = currentClass.getSuperclass();
+            }
+        }
+        return null;
     }
 
     private boolean isSimpleValue(Object value) {
@@ -196,16 +255,26 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
     }
 
     private String toAbsoluteStoragePath(String value) {
-        String relativePath = extractStorageRelativePath(value);
+        String relativePath = extractSafeStorageRelativePath(value);
         if (relativePath == null) {
             return value;
         }
 
         Path resolvedPath = storageRootPath.resolve(relativePath).normalize();
-        if (!resolvedPath.startsWith(storageRootPath)) {
-            return value;
-        }
         return resolvedPath.toString();
+    }
+
+    private String extractSafeStorageRelativePath(String value) {
+        String relativePath = extractStorageRelativePath(value);
+        if (relativePath == null) {
+            return null;
+        }
+
+        Path resolvedPath = storageRootPath.resolve(relativePath).normalize();
+        if (!resolvedPath.startsWith(storageRootPath)) {
+            return null;
+        }
+        return relativePath;
     }
 
     private String extractStorageRelativePath(String value) {

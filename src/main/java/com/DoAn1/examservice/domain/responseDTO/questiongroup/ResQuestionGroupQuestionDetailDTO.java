@@ -15,6 +15,7 @@ public class ResQuestionGroupQuestionDetailDTO {
     private UUID questionUuid;
     private String questionContent;
     private String imagePath;
+    private String relativePath;
     private String questionTopic;
     private QuestionType questionType;
 }

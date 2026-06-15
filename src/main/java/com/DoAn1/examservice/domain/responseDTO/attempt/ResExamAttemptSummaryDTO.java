@@ -28,5 +28,7 @@ public class ResExamAttemptSummaryDTO {
     private Boolean isAutoSubmitted;
     private Integer violationCount;
     private String rawImageUrl;
+    private String rawImageRelativePath;
     private String scoredImageUrl;
+    private String scoredImageRelativePath;
 }

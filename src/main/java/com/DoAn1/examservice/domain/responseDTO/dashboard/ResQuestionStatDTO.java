@@ -18,6 +18,7 @@ public class ResQuestionStatDTO {
     private QuestionType questionType;
     private String questionContent;
     private String imagePath;
+    private String relativePath;
     private String correctAnswer;
     private Map<String, Long> answerCounts;
 }
