@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout ExamService
+        uses: actions/checkout@v4
+
+      - name: Checkout shared proto
+        uses: actions/checkout@v4
+        with:
+          repository: PhDuy2005/DoAn1_BhpWebsite
+          path: .ci/shared
+          token: ${{ secrets.CI_REPO_TOKEN || github.token }}
+
+      - name: Prepare proto files
+        run: |
+          mkdir -p ../../proto
+          cp -R .ci/shared/proto/. ../../proto/
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build
+        run: ./gradlew clean build --no-daemon
