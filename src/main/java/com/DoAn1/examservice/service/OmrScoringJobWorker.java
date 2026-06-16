@@ -244,6 +244,7 @@ public class OmrScoringJobWorker {
         if (!hasText(schoolYear)) {
             throw new IllegalArgumentException("School year is required");
         }
+        String normalizedStudentCode = normalizeStudentCode(studentCode);
 
         ManagedChannel channel = ManagedChannelBuilder
                 .forAddress(managementServiceHost, managementServicePort)
@@ -256,31 +257,35 @@ public class OmrScoringJobWorker {
                     .withDeadlineAfter(managementServiceTimeoutSeconds, TimeUnit.SECONDS);
             StudentResolver.ResolveStudentsRequest request = StudentResolver.ResolveStudentsRequest.newBuilder()
                     .setSchoolYear(schoolYear)
-                    .addStudentIds(studentCode)
+                    .addStudentIds(normalizedStudentCode)
                     .build();
             StudentResolver.ResolveStudentsResponse response;
             try {
                 response = stub.resolveStudents(request);
             } catch (StatusRuntimeException ex) {
-                throw mapStudentResolverGrpcException(studentCode, ex);
+                throw mapStudentResolverGrpcException(normalizedStudentCode, ex);
             }
 
-            if (response.getUnresolvedStudentIdsList().contains(studentCode)) {
-                throw new IllegalArgumentException("Student code could not be resolved: " + studentCode);
+            if (response.getUnresolvedStudentIdsList().contains(normalizedStudentCode)) {
+                throw new IllegalArgumentException("Student code could not be resolved: " + normalizedStudentCode);
             }
 
             return response.getStudentsList().stream()
-                    .filter(student -> studentCode.equals(student.getStudentId()))
+                    .filter(student -> normalizedStudentCode.equals(student.getStudentId()))
                     .findFirst()
                     .map(student -> new ResolvedStudentIdentity(
                             parseUserUuid(student),
                             student.getStudentId(),
                             student.getFullname()))
                     .orElseThrow(() -> new IllegalArgumentException(
-                            "Student code could not be resolved: " + studentCode));
+                            "Student code could not be resolved: " + normalizedStudentCode));
         } finally {
             channel.shutdown();
         }
+    }
+
+    private String normalizeStudentCode(String studentCode) {
+        return studentCode.trim().replaceFirst("^0+(?!$)", "");
     }
 
     private RuntimeException mapStudentResolverGrpcException(String studentCode, StatusRuntimeException ex) {

@@ -2,8 +2,6 @@ package com.DoAn1.examservice.util;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.IdentityHashMap;
@@ -29,12 +27,14 @@ import jakarta.servlet.http.HttpServletResponse;
 @RestControllerAdvice
 public class FormatRestResponse implements ResponseBodyAdvice<Object> {
 
-    private static final String STORAGE_PATH_PREFIX = "/storage/";
-
     private final Path storageRootPath;
+    private final StorageUrlPrefixResolver storageUrlPrefixResolver;
 
-    public FormatRestResponse(@Value("${examservice.storage.root-path:D:/DoAn/DoAn1_storage}") String storageRootPath) {
+    public FormatRestResponse(
+            @Value("${examservice.storage.root-path:D:/DoAn/DoAn1_storage}") String storageRootPath,
+            @Value("${examservice.storage.url-prefixes:/storage/}") String storageUrlPrefixes) {
         this.storageRootPath = Path.of(storageRootPath).toAbsolutePath().normalize();
+        this.storageUrlPrefixResolver = new StorageUrlPrefixResolver(storageUrlPrefixes);
     }
 
     @Override
@@ -278,23 +278,7 @@ public class FormatRestResponse implements ResponseBodyAdvice<Object> {
     }
 
     private String extractStorageRelativePath(String value) {
-        if (value == null) {
-            return null;
-        }
-        if (value.startsWith(STORAGE_PATH_PREFIX)) {
-            return value.substring(STORAGE_PATH_PREFIX.length());
-        }
-        if (value.startsWith("http://") || value.startsWith("https://")) {
-            try {
-                String path = new URI(value).getPath();
-                if (path != null && path.startsWith(STORAGE_PATH_PREFIX)) {
-                    return path.substring(STORAGE_PATH_PREFIX.length());
-                }
-            } catch (URISyntaxException ignored) {
-                return null;
-            }
-        }
-        return null;
+        return storageUrlPrefixResolver.extractRelativePath(value);
     }
 }
 

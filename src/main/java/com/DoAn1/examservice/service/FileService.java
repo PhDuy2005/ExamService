@@ -2,8 +2,6 @@ package com.DoAn1.examservice.service;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -14,14 +12,16 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.DoAn1.examservice.exception.StorageException;
+import com.DoAn1.examservice.util.StorageUrlPrefixResolver;
 
 @Service
 public class FileService {
 
-    private static final String STORAGE_PATH_PREFIX = "/storage/";
-
     @Value("${examservice.storage.root-path:D:/DoAn/DoAn1_storage}")
     private String baseURI;
+
+    @Value("${examservice.storage.url-prefixes:/storage/}")
+    private String storageUrlPrefixes = StorageUrlPrefixResolver.DEFAULT_STORAGE_PATH_PREFIX;
 
     public void createUploadFolder(String folder) throws IOException {
         Files.createDirectories(resolveFolder(folder));
@@ -49,7 +49,7 @@ public class FileService {
     }
 
     public String buildStorageUrl(String folder, String fileName) {
-        return STORAGE_PATH_PREFIX + buildStorageRelativePath(folder, fileName);
+        return StorageUrlPrefixResolver.DEFAULT_STORAGE_PATH_PREFIX + buildStorageRelativePath(folder, fileName);
     }
 
     public String buildStorageRelativePath(String folder, String fileName) {
@@ -80,11 +80,11 @@ public class FileService {
     }
 
     public Path resolveStorageUrl(String storageUrl) {
-        if (!StringUtils.hasText(storageUrl) || !storageUrl.startsWith("/storage/")) {
+        String relativePath = new StorageUrlPrefixResolver(storageUrlPrefixes).extractRelativePath(storageUrl);
+        if (relativePath == null) {
             throw new StorageException("Invalid storage URL");
         }
 
-        String relativePath = storageUrl.substring("/storage/".length());
         return resolveStorageRelativePath(relativePath);
     }
 
@@ -104,18 +104,11 @@ public class FileService {
         }
 
         String trimmedValue = value.trim();
-        if (trimmedValue.startsWith(STORAGE_PATH_PREFIX)) {
-            return normalizeStorageRelativePath(trimmedValue.substring(STORAGE_PATH_PREFIX.length()));
+        String relativePath = new StorageUrlPrefixResolver(storageUrlPrefixes).extractRelativePath(trimmedValue);
+        if (relativePath != null) {
+            return normalizeStorageRelativePath(relativePath);
         }
         if (trimmedValue.startsWith("http://") || trimmedValue.startsWith("https://")) {
-            try {
-                String path = new URI(trimmedValue).getPath();
-                if (path != null && path.startsWith(STORAGE_PATH_PREFIX)) {
-                    return normalizeStorageRelativePath(path.substring(STORAGE_PATH_PREFIX.length()));
-                }
-            } catch (URISyntaxException ex) {
-                return null;
-            }
             return null;
         }
 
